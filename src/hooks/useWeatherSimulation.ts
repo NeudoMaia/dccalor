@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { StationData, AIAnalysis } from '../types';
 import { INITIAL_STATIONS } from '../constants';
 import { calculateHeatIndex, getStatusFromHeatIndex } from '../lib/utils';
@@ -13,6 +13,7 @@ export function useWeatherSimulation() {
   const [stations, setStations] = useState<StationData[]>(INITIAL_STATIONS);
   const [aiReport, setAiReport] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
+  const stationsRef = useRef<StationData[]>(stations);
 
   const updateSimulation = useCallback(() => {
     setStations(prev => {
@@ -41,6 +42,10 @@ export function useWeatherSimulation() {
   }, []);
 
   useEffect(() => {
+    stationsRef.current = stations;
+  }, [stations]);
+
+  useEffect(() => {
     const interval = setInterval(updateSimulation, 5000);
     return () => clearInterval(interval);
   }, [updateSimulation]);
@@ -50,7 +55,7 @@ export function useWeatherSimulation() {
     const fetchAI = async () => {
       setLoadingAI(true);
       try {
-        const report = await analyzeThermalData(stations);
+        const report = await analyzeThermalData(stationsRef.current);
         setAiReport(report);
       } catch (error) {
         console.error("AI Analysis failed, skipping:", error);
@@ -62,7 +67,7 @@ export function useWeatherSimulation() {
     const interval = setInterval(fetchAI, 300000);
     fetchAI(); // Initial call
     return () => clearInterval(interval);
-  }, [stations.length]);
+  }, []);
 
 
   const addSensor = (sensor: Omit<StationData, 'id' | 'delta' | 'status' | 'heatIndex' | 'avgAnomaly'>) => {

@@ -38,14 +38,18 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
                 <Loader2 className="w-6 h-6 animate-spin" />
                 <span className="font-bold text-[10px] uppercase tracking-widest italic">Processando padrões térmicos...</span>
               </div>
-            ) : (
+            ) : analysis?.report ? (
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="text-blue-50 leading-relaxed text-base font-medium italic"
               >
-                {analysis?.report}
+                {analysis.report}
               </motion.p>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-32 text-blue-200/70 gap-3">
+                <span className="font-bold text-[10px] uppercase tracking-widest italic">Nenhum resultado disponível no momento.</span>
+              </div>
             )}
           </div>
         </div>
@@ -54,41 +58,45 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
           <h3 className="text-xs font-bold text-slate-800 mb-6 uppercase tracking-widest border-b border-slate-100 pb-3">Protocolos e Medidas Preventivas</h3>
           
           <div className="space-y-3">
-            {analysis?.recommendations.map((rec) => (
-              <motion.div 
-                key={rec.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className={cn(
-                  "flex gap-4 p-4 rounded-lg border transition-all duration-300",
-                  rec.type === 'HEALTH' ? "bg-red-50/50 border-red-100" : 
-                  rec.type === 'TRAFFIC' ? "bg-amber-50/50 border-amber-100" : 
-                  "bg-blue-50/50 border-blue-100"
-                )}
-              >
-                <div className={cn(
-                  "p-2.5 h-fit rounded bg-white border shadow-sm",
-                  rec.type === 'HEALTH' ? "text-red-500 border-red-100" : 
-                  rec.type === 'TRAFFIC' ? "text-amber-600 border-amber-100" : 
-                  "text-blue-600 border-blue-100"
-                )}>
-                  {rec.type === 'HEALTH' ? <Ambulance className="w-5 h-5" /> : 
-                   rec.type === 'TRAFFIC' ? <TrafficCone className="w-5 h-5" /> : 
-                   <Bell className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h4 className={cn(
-                    "font-bold text-sm tracking-tight mb-0.5",
-                    rec.type === 'HEALTH' ? "text-red-900" : (rec.type === 'TRAFFIC' ? "text-amber-900" : "text-blue-900")
+            {analysis?.recommendations?.length ? (
+              analysis.recommendations.map((rec) => (
+                <motion.div 
+                  key={rec.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className={cn(
+                    "flex gap-4 p-4 rounded-lg border transition-all duration-300",
+                    rec.type === 'HEALTH' ? "bg-red-50/50 border-red-100" : 
+                    rec.type === 'TRAFFIC' ? "bg-amber-50/50 border-amber-100" : 
+                    "bg-blue-50/50 border-blue-100"
+                  )}
+                >
+                  <div className={cn(
+                    "p-2.5 h-fit rounded bg-white border shadow-sm",
+                    rec.type === 'HEALTH' ? "text-red-500 border-red-100" : 
+                    rec.type === 'TRAFFIC' ? "text-amber-600 border-amber-100" : 
+                    "text-blue-600 border-blue-100"
                   )}>
-                    {rec.title}
-                  </h4>
-                  <p className="text-slate-500 text-xs font-medium leading-relaxed">
-                    {rec.description}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                    {rec.type === 'HEALTH' ? <Ambulance className="w-5 h-5" /> : 
+                     rec.type === 'TRAFFIC' ? <TrafficCone className="w-5 h-5" /> : 
+                     <Bell className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h4 className={cn(
+                      "font-bold text-sm tracking-tight mb-0.5",
+                      rec.type === 'HEALTH' ? "text-red-900" : (rec.type === 'TRAFFIC' ? "text-amber-900" : "text-blue-900")
+                    )}>
+                      {rec.title}
+                    </h4>
+                    <p className="text-slate-500 text-xs font-medium leading-relaxed">
+                      {rec.description}
+                    </p>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-slate-400 text-sm italic">Nenhum protocolo disponível no momento. Aguarde a análise ou verifique a conexão com o serviço de IA.</div>
+            )}
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-100">
