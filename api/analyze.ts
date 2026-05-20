@@ -40,32 +40,26 @@ const fallbackResponse: AIAnalysis = {
   ],
 };
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    return new Response(JSON.stringify({
+    res.status(500).json({
       error: 'GEMINI_API_KEY não configurada no ambiente do servidor.',
-      ...fallbackResponse
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      ...fallbackResponse,
     });
+    return;
   }
 
   let payload: { stations: StationData[] };
   try {
-    payload = await req.json();
+    payload = req.body;
   } catch (error) {
-    return new Response(JSON.stringify({ error: 'Corpo inválido', ...fallbackResponse }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    res.status(400).json({ error: 'Corpo inválido', ...fallbackResponse });
+    return;
   }
 
   const stationSummary = payload.stations.map((s) => (
@@ -113,15 +107,9 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     const parsed = JSON.parse(response.text || '{}') as AIAnalysis;
-    return new Response(JSON.stringify(parsed), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    res.status(200).json(parsed);
   } catch (error) {
     console.error('AI Analysis failed:', error);
-    return new Response(JSON.stringify({ error: 'Falha no serviço de IA', ...fallbackResponse }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    res.status(500).json({ error: 'Falha no serviço de IA', ...fallbackResponse });
   }
 }
