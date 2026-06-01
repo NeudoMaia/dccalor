@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { WeatherCard } from './components/dashboard/WeatherCard';
@@ -19,7 +19,21 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
-  const { stations, aiReport, loadingAI, addSensor } = useWeatherSimulation();
+  const { stations, aiReport, loadingAI, addSensor, isLive } = useWeatherSimulation();
+
+  // Calcular ponto mais quente, mais frio e a amplitude térmica da rede
+  const sortedByTemp = useMemo(() => {
+    // Filtrar IoT ou qualquer estação válida
+    return [...stations].sort((a, b) => b.temp - a.temp);
+  }, [stations]);
+
+  const hottestStation = sortedByTemp[0];
+  const coolestStation = sortedByTemp[sortedByTemp.length - 1];
+  
+  const tempDiff = useMemo(() => {
+    if (!hottestStation || !coolestStation) return 0;
+    return parseFloat((hottestStation.temp - coolestStation.temp).toFixed(1));
+  }, [hottestStation, coolestStation]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -33,7 +47,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-50 text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900">
-      <Header title={getPageTitle()} />
+      <Header title={getPageTitle()} isLive={isLive} />
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -55,19 +69,22 @@ export default function App() {
                   ))}
                   <div className="bg-white border-2 border-orange-600 p-5 rounded-xl shadow-md flex flex-col justify-between group hover:bg-orange-50 transition-colors">
                     <div>
-                      <p className="text-[11px] font-bold text-orange-700 uppercase tracking-widest leading-none mb-2">Ponto de Atenção (15 dias)</p>
-                      <h3 className="text-xl font-bold text-orange-900 uppercase tracking-tighter">
-                        {[...stations].sort((a,b) => b.avgAnomaly - a.avgAnomaly)[0]?.primaryArea || 'Centro'}
+                      <p className="text-[11px] font-bold text-orange-700 uppercase tracking-widest leading-none mb-2">Ponto de Atenção / Área Crítica</p>
+                      <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tighter">
+                        {hottestStation?.primaryArea || 'Centro'}
                       </h3>
+                      <p className="text-[9px] text-slate-500 font-bold mt-1 uppercase tracking-tighter">
+                        Temp. Máxima: {hottestStation?.temp}°C
+                      </p>
                     </div>
-                    <div className="mt-4">
-                      <div className="flex justify-between items-end mb-1">
-                        <span className="text-[10px] font-bold text-orange-800 opacity-60">Anomalia Média</span>
-                        <span className="text-[10px] font-mono font-bold text-orange-700">+{[...stations].sort((a,b) => b.avgAnomaly - a.avgAnomaly)[0]?.avgAnomaly || 0}°C</span>
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-black text-orange-800 uppercase tracking-wider">Gradiente Térmico</span>
+                        <span className="text-sm font-mono font-bold text-orange-700">+{tempDiff}°C</span>
                       </div>
-                      <div className="h-1.5 w-full bg-orange-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-orange-600 rounded-full" style={{ width: `${([...stations].sort((a,b) => b.avgAnomaly - a.avgAnomaly)[0]?.avgAnomaly || 0) * 20}%` }}></div>
-                      </div>
+                      <p className="text-[9px] text-slate-400 font-medium leading-tight">
+                        {hottestStation?.name} ({hottestStation?.temp}°C) vs {coolestStation?.name} ({coolestStation?.temp}°C)
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -134,10 +151,9 @@ export default function App() {
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span> 
             Sincronização: Tempo Real (5s)
           </span>
-          <span className="text-slate-300">v3.2.0 - SISTEMA INTEGRADO DE SAÚDE E DEFESA CIVIL</span>
+          <span className="text-slate-300">v4.0.0 - IDT (Thom) + ICU + IDW + Holt</span>
         </div>
       </footer>
     </div>
   );
 }
-

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { BookOpen, Calculator, Database, PenTool, GitBranch } from 'lucide-react';
+import { BookOpen, Calculator, Database, PenTool, GitBranch, TrendingUp } from 'lucide-react';
 
 export const TechnicalManual: React.FC = () => {
   return (
@@ -15,7 +15,7 @@ export const TechnicalManual: React.FC = () => {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Documentação Técnica Detalhada: SITermal</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Documentação Técnica Detalhada: SITermal v4.0</h2>
             <p className="text-slate-500 font-medium">Fundamentos, Modelagem e Inteligência Analítica</p>
           </div>
         </div>
@@ -27,9 +27,10 @@ export const TechnicalManual: React.FC = () => {
               <PenTool className="w-4 h-4" /> 1. Planejamento e Escopo
             </h3>
             <p className="text-sm text-slate-600 leading-relaxed text-justify">
-              O projeto foi planejado como uma parceria estratégica entre a Defesa Civil e a Secretaria Municipal de Saúde de Fortaleza.
+              O projeto foi planejado como uma iniciativa estratégica da Defesa Civil de Fortaleza.
               O objetivo central é a monitorização contínua de Ilhas de Calor (ICU) para mitigação de riscos à saúde pública e otimização da infraestrutura urbana.
-              O sistema baseia-se em uma infraestrutura descentralizada de sensores IoT, garantindo alta granularidade de dados espaciais.
+              O sistema utiliza o <strong>Índice de Desconforto Térmico (IDT - Fórmula de Thom)</strong> para avaliar o estresse térmico,
+              a <strong>Intensidade da ICU</strong> comparada a uma estação de referência, e <strong>interpolação IDW</strong> para espacialização contínua.
             </p>
           </div>
 
@@ -39,7 +40,11 @@ export const TechnicalManual: React.FC = () => {
               <GitBranch className="w-4 h-4" /> 2. Metodologia e Técnica
             </h3>
             <p className="text-sm text-slate-600 leading-relaxed text-justify">
-              Utilizamos uma abordagem de <strong>Baseline Dinâmica</strong>. Em vez de médias históricas estáticas, o sistema varre a malha a cada 5 segundos para identificar o ponto mais fresco da cidade (nó base). Os gradientes térmicos são processados em relação a essa referência mutável, permitindo detecção imediata de anomalias térmicas induzidas por urbanização (asfalto, concreto) em tempo real.
+              Utilizamos a metodologia de <strong>Referência Térmica Dinâmica</strong>. Em vez de fixar um bairro geograficamente, 
+              o sistema identifica dinamicamente a estação mais fria da rede no ciclo de leitura (T_mín) como controle natural. 
+              A intensidade da ICU de cada bairro é dada por <code className="bg-slate-100 px-1 rounded text-xs">ICU = T_urbana − T_mín</code>. 
+              O conforto térmico é calibrado especificamente para Fortaleza: zona de conforto ajustada para **24°C a 27°C** devido à aclimatação local, 
+              alertando para **fadiga térmica** em umidades elevadas (&gt;70%, que impedem a evaporação do suor) e incorporando o **efeito refrigerante dos ventos alísios** (que aumentam o conforto térmico cutâneo).
             </p>
           </div>
 
@@ -50,10 +55,11 @@ export const TechnicalManual: React.FC = () => {
             </h3>
             <ul className="text-sm text-slate-600 list-disc list-inside space-y-1">
               <li><strong>T</strong> (Temperatura): Temperatura ambiente (°C) captada pelos sensores.</li>
-              <li><strong>U</strong> (Umidade): Umidade relativa do ar (%).</li>
-              <li><strong>HI</strong> (Heat Index): Temperatura aparente percebida pelo corpo humano.</li>
-              <li><strong>ΔT</strong> (Delta): Desvio de temperatura em relação à base mais fria da malha.</li>
-              <li><strong>Radius</strong>: Raio de influência (2km) da estação primária.</li>
+              <li><strong>UR</strong> (Umidade): Umidade relativa do ar (%).</li>
+              <li><strong>IDT</strong> (Índice de Desconforto Térmico): Temperatura aparente percebida pelo corpo humano, calculada pela Fórmula de Thom.</li>
+              <li><strong>ICU</strong> (Intensidade da Ilha de Calor): Diferença entre a temperatura da estação urbana e o ponto de controle térmico dinâmico da cidade (estação mais fria do ciclo).</li>
+              <li><strong>IDW</strong> (Inverse Distance Weighting): Método de interpolação espacial para estimar valores entre estações e gerar mapa contínuo.</li>
+              <li><strong>Holt</strong>: Modelo de Suavização Exponencial Dupla para previsão de séries temporais (7 dias).</li>
             </ul>
           </div>
 
@@ -62,25 +68,65 @@ export const TechnicalManual: React.FC = () => {
             <h3 className="text-sm font-black text-blue-700 uppercase tracking-widest flex items-center gap-2">
               <Calculator className="w-4 h-4" /> 4. Manuseio Matemático
             </h3>
-            <div className="bg-slate-50 p-4 rounded-lg font-mono text-xs text-slate-700 space-y-2">
-              <p><strong>Cálculo do Índice de Calor (Steadman):</strong></p>
-              <code>HI = T + (0.33 * (U/100) * T) - 4</code>
-              <p className="mt-4"><strong>Cálculo do Delta Térmico:</strong></p>
-              <code>ΔT = T_local - min(T_malha)</code>
-              <p className="mt-2 text-[10px] text-slate-500 italic">*Os resultados são normalizados para garantir a estabilidade do fluxo de dados.</p>
+            <div className="bg-slate-50 p-4 rounded-lg font-mono text-xs text-slate-700 space-y-3">
+              <div>
+                <p><strong>IDT — Índice de Desconforto Térmico (Thom):</strong></p>
+                <code>IDT = T − (0.55 − 0.0055 × UR) × (T − 14.5)</code>
+              </div>
+              <div>
+                <p><strong>ICU — Intensidade da Ilha de Calor:</strong></p>
+                <code>ICU = T_urbana − T_referência</code>
+              </div>
+              <div>
+                <p><strong>IDW — Interpolação Espacial:</strong></p>
+                <code>Z(x) = Σ(Zi / di²) / Σ(1 / di²)</code>
+              </div>
+              <div>
+                <p><strong>Previsão (Holt — Suavização Exponencial Dupla):</strong></p>
+                <code>S_t = α·Y_t + (1−α)·(S_{"t-1"} + b_{"t-1"})</code>
+                <br />
+                <code>b_t = β·(S_t − S_{"t-1"}) + (1−β)·b_{"t-1"}</code>
+                <br />
+                <code>F_{"t+m"} = S_t + m·b_t</code>
+              </div>
+              <p className="mt-2 text-[10px] text-slate-500 italic">
+                *Classificação de Alerta: {"<"}24°C Confortável | 24–27°C Alerta Amarelo | 28–29°C Alerta Laranja | ≥30°C Alerta Vermelho
+              </p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Seção Predição */}
+      <div className="bg-violet-50 border border-violet-200 rounded-xl p-8 shadow-sm">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="p-3 bg-violet-700 text-white rounded-lg shadow-lg">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-violet-900">Modelagem Preditiva</h3>
+            <p className="text-violet-600 text-sm font-medium">Projeção de Séries Temporais para Prevenção</p>
+          </div>
+        </div>
+        <p className="text-sm text-violet-800 leading-relaxed">
+          O sistema utiliza o método de <strong>Holt (Suavização Exponencial Dupla)</strong> como modelo
+          preditivo leve para projeções de 7 dias. Para evolução futura, recomenda-se migrar para
+          <strong> ARIMAX/Prophet/LSTM</strong> via endpoint Python com regressores externos
+          (radiação solar, velocidade do vento), conforme equação:
+        </p>
+        <div className="bg-white/60 rounded-lg p-3 mt-3 font-mono text-xs text-violet-700">
+          <code>T_t = α + Σ(φi·T_{"t-i"}) + β1(Radiação) + β2(Vento) + εt</code>
+        </div>
+      </div>
       
-      {/* ... [Restante do código original mantido] */}
+      {/* Sobre o SITermal */}
       <div className="bg-slate-900 rounded-xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-20 -top-20 w-80 h-80 bg-slate-800 rounded-full blur-3xl opacity-50" />
         <div className="relative z-10">
           <h3 className="text-lg font-bold mb-2">Sobre o SITermal</h3>
           <p className="text-slate-400 text-sm leading-relaxed">
-            Sistema de monitoramento de ilhas de calor urbana desenvolvido pela Defesa Civil de Fortaleza 
-            em parceria com a Secretaria Municipal de Saúde. Versão 3.2.0.
+            Sistema de monitoramento de ilhas de calor urbana desenvolvido como iniciativa da Defesa Civil de Fortaleza. Versão 4.1.0.
+            Modelos: IDT (Thom), ICU (Estação de Referência), IDW (Interpolação Espacial), Holt (Previsão).
           </p>
         </div>
       </div>

@@ -8,9 +8,10 @@ import React, { useState, useEffect } from 'react';
 
 interface HeaderProps {
   title: string;
+  isLive?: boolean;
 }
 
-export function Header({ title }: HeaderProps) {
+export function Header({ title, isLive }: HeaderProps) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -26,14 +27,18 @@ export function Header({ title }: HeaderProps) {
           <h1 className="text-lg font-bold text-slate-800 leading-tight">
             SITermal <span className="font-normal text-slate-400 mx-2">|</span> <span className="text-blue-600">{title}</span>
           </h1>
-          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Monitoramento de Ilhas de Calor Urbana (ICU) - Fortaleza</p>
+          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+            Monitoramento de Ilhas de Calor Urbana (ICU) — IDT Thom + IDW + Holt
+          </p>
         </div>
       </div>
       
       <div className="flex items-center gap-6">
         <div className="hidden md:flex items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-tighter">Sistemas Estáveis</span>
+          <span className={`flex h-2 w-2 rounded-full animate-pulse ${isLive ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-tighter">
+            {isLive ? 'Tempo Real (Plugfield)' : 'Simulação Offline'}
+          </span>
         </div>
         <div className="h-8 w-px bg-slate-200"></div>
         <div className="flex gap-3">

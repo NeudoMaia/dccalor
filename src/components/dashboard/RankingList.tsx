@@ -14,6 +14,7 @@ interface RankingListProps {
 
 export const RankingList: React.FC<RankingListProps> = ({ stations }) => {
   const sorted = [...stations].sort((a, b) => b.temp - a.temp);
+  const referenceStation = stations.find(s => s.isReference);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-full overflow-hidden">
@@ -35,8 +36,8 @@ export const RankingList: React.FC<RankingListProps> = ({ stations }) => {
               <p className="text-[10px] text-slate-400 italic">
                 ΔT: <span className={cn(
                   "font-mono font-bold",
-                  station.delta > 1.5 ? "text-rose-600" : (station.delta > 0.5 ? "text-orange-600" : "text-emerald-600")
-                )}>+{station.delta.toFixed(1)}°C</span>
+                  station.icu > 2 ? "text-rose-600" : (station.icu > 1 ? "text-orange-600" : "text-emerald-600")
+                )}>+{station.icu.toFixed(1)}°C</span>
               </p>
             </div>
             
@@ -53,9 +54,11 @@ export const RankingList: React.FC<RankingListProps> = ({ stations }) => {
       </div>
 
       <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
-        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Base de Referência</span>
-        <span className="text-[10px] font-mono text-slate-700 px-1.5 py-0.5 bg-slate-50 rounded">
-          {Math.min(...stations.map(s => s.temp)).toFixed(1)}°C
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+          Ref: {referenceStation ? referenceStation.name.replace(' (Ref. Térmica)', '') : 'Mínima'}
+        </span>
+        <span className="text-[10px] font-mono text-slate-700 px-1.5 py-0.5 bg-slate-50 rounded font-bold">
+          {referenceStation ? referenceStation.temp.toFixed(1) : Math.min(...stations.map(s => s.temp)).toFixed(1)}°C
         </span>
       </div>
     </div>

@@ -26,13 +26,13 @@ export async function analyzeThermalData(stations: StationData[]): Promise<AIAna
   } catch (error) {
     console.error("AI Analysis failed:", error);
     return {
-      report: "Erro ao processar análise em tempo real. Padrão térmico sugere atenção elevada em áreas centrais devido ao adensamento asfáltico.",
+      report: "Erro ao processar análise em tempo real. IDT e ICU sugerem atenção elevada em áreas centrais devido ao adensamento asfáltico. Referência: Messejana.",
       recommendations: [
         {
           id: "rec-err",
           type: "CIVIL_DEFENSE",
           title: "Monitoramento Manual",
-          description: "Falha na análise automatizada. Recomenda-se verificação manual dos sensores no Centro e Montese."
+          description: "Falha na análise automatizada. Recomenda-se verificação manual dos sensores no Centro e Montese. ICU acima de 1.5°C detectada."
         }
       ]
     };

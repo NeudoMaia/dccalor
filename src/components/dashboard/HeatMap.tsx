@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { StationData } from '../../types';
 import { FORTALEZA_CENTER } from '../../constants';
+import { generateIDWGrid, FORTALEZA_BOUNDS, idtToColor } from '../../lib/idw';
 
 // Fix for default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -33,11 +34,95 @@ function InvalidateMap() {
   return null;
 }
 
+/**
+ * IDWOverlay — Renderiza uma camada canvas com interpolação IDW sobre o mapa.
+ * Usa a grade gerada por generateIDWGrid e pinta cada célula com a cor
+ * correspondente ao IDT interpolado naquele ponto.
+ */
+function IDWOverlay({ stations }: { stations: StationData[] }) {
+  const map = useMap();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [, setRenderTick] = useState(0);
+
+  // Force re-render on map move/zoom
+  useEffect(() => {
+    const handler = () => setRenderTick(t => t + 1);
+    map.on('moveend zoomend resize', handler);
+    return () => { map.off('moveend zoomend resize', handler); };
+  }, [map]);
+
+  useEffect(() => {
+    if (!canvasRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.style.position = 'absolute';
+      canvas.style.top = '0';
+      canvas.style.left = '0';
+      canvas.style.pointerEvents = 'none';
+      canvas.style.zIndex = '350'; // Above tiles, below markers
+      const pane = map.getContainer().querySelector('.leaflet-overlay-pane');
+      if (pane) pane.appendChild(canvas);
+      canvasRef.current = canvas;
+    }
+
+    const canvas = canvasRef.current;
+    const size = map.getSize();
+    canvas.width = size.x;
+    canvas.height = size.y;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx || stations.length < 2) return;
+
+    const resolution = 35;
+    const grid = generateIDWGrid(stations, resolution, 2);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < grid.length - 1; i++) {
+      for (let j = 0; j < grid[i].length - 1; j++) {
+        const point = grid[i][j];
+        const nextI = grid[i + 1][j];
+        const nextJ = grid[i][j + 1];
+
+        const topLeft = map.latLngToContainerPoint([point.lat, point.lng]);
+        const bottomRight = map.latLngToContainerPoint([nextI.lat, nextJ.lng]);
+
+        const w = bottomRight.x - topLeft.x;
+        const h = bottomRight.y - topLeft.y;
+
+        if (w > 0 && h > 0) {
+          ctx.fillStyle = idtToColor(point.idt, 0.35);
+          ctx.fillRect(topLeft.x, topLeft.y, w, h);
+        }
+      }
+    }
+
+    return () => {
+      if (canvasRef.current) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+  }, [map, stations]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (canvasRef.current) {
+        canvasRef.current.remove();
+        canvasRef.current = null;
+      }
+    };
+  }, []);
+
+  return null;
+}
+
 export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
   const getCircleColor = (status: string) => {
     switch (status) {
-      case 'ALERT': return '#dc2626';
-      case 'ATTENTION': return '#eab308';
+      case 'COMFORTABLE': return '#10b981';
+      case 'YELLOW_ALERT': return '#eab308';
+      case 'ORANGE_ALERT': return '#f97316';
+      case 'RED_ALERT': return '#dc2626';
       default: return '#10b981';
     }
   };
@@ -55,6 +140,7 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
         <InvalidateMap />
+        <IDWOverlay stations={stations} />
         
         {stations.map(station => (
           <React.Fragment key={station.id}>
@@ -63,17 +149,18 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
                 <div className="p-1">
                   <h4 className="font-bold text-slate-800 m-0">{station.name}</h4>
                   <p className="text-xs text-slate-500 m-0 mt-1">Temp: {station.temp}°C</p>
-                  <p className="text-xs text-slate-500 m-0">Index: {station.heatIndex}°C</p>
+                  <p className="text-xs text-slate-500 m-0">IDT: {station.idt}</p>
+                  <p className="text-xs text-slate-500 m-0">ICU: +{station.icu}°C</p>
                 </div>
               </Popup>
             </Marker>
             <Circle 
               center={[station.lat, station.lng]}
-              radius={station.status === 'ALERT' ? 2500 : 2000}
+              radius={2000}
               pathOptions={{
                 color: getCircleColor(station.status),
                 fillColor: getCircleColor(station.status),
-                fillOpacity: 0.2 + (station.delta * 0.1),
+                fillOpacity: 0.2 + (station.icu * 0.1),
                 weight: 1,
                 dashArray: station.isIoT ? '5, 10' : undefined
               }}
@@ -84,23 +171,37 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
 
       {/* Map Legend */}
       <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur p-4 rounded-2xl border border-slate-200 shadow-xl z-[400] text-xs pointer-events-none">
-        <h4 className="font-black text-slate-800 mb-3 uppercase tracking-wider text-[10px]">Densidade Térmica (ΔT)</h4>
+        <h4 className="font-black text-slate-800 mb-3 uppercase tracking-wider text-[10px]">Nível de Alerta de Calor</h4>
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0,0,8px,rgba(16,185,129,0.5)]"></span>
-            <span className="font-bold text-slate-600">Normal (ΔT {'<'} 0.5)</span>
+            <span className="font-bold text-slate-600">Confortável ({"<"} 24°C)</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0,0,8px,rgba(234,179,8,0.5)]"></span>
-            <span className="font-bold text-slate-600">Atenção (ΔT {'<'} 1.5)</span>
+            <span className="font-bold text-slate-600">Alerta Amarelo (24°C–27°C)</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-orange-500 shadow-[0,0,8px,rgba(249,115,22,0.5)]"></span>
+            <span className="font-bold text-slate-600">Alerta Laranja (28°C–29°C)</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-red-600 shadow-[0,0,8px,rgba(220,38,38,0.5)]"></span>
-            <span className="font-bold text-slate-600">Alerta (ΔT {'>'} 1.5)</span>
+            <span className="font-bold text-slate-600">Alerta Vermelho (≥ 30°C)</span>
           </div>
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-200">
             <span className="w-3 h-3 rounded-full border-2 border-blue-500 border-dashed"></span>
             <span className="font-bold text-slate-600">Sensor IoT Georreferenciado</span>
+          </div>
+          {/* IDW Interpolation legend */}
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-200">
+            <span
+              className="w-12 h-3 rounded"
+              style={{
+                background: 'linear-gradient(to right, #10b981, #eab308, #f97316, #dc2626)',
+              }}
+            ></span>
+            <span className="font-bold text-slate-600">Interpolação IDW (IDT)</span>
           </div>
         </div>
       </div>

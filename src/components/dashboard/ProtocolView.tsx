@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { AIAnalysis } from '../../types';
-import { Brain, Bell, Ambulance, TrafficCone, ShieldAlert, Loader2 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { Brain, Bell, Ambulance, TrafficCone, ShieldAlert, Loader2, CheckCircle2, AlertTriangle, Siren } from 'lucide-react';
+import { cn, IDT_ALERT_TABLE, getAlertInfo } from '../../lib/utils';
 import { motion } from 'motion/react';
 
 interface ProtocolViewProps {
@@ -14,11 +14,76 @@ interface ProtocolViewProps {
   loading: boolean;
 }
 
+const alertIcons: Record<string, React.ReactNode> = {
+  COMFORTABLE: <CheckCircle2 className="w-5 h-5" />,
+  YELLOW_ALERT: <AlertTriangle className="w-5 h-5" />,
+  ORANGE_ALERT: <AlertTriangle className="w-5 h-5" />,
+  RED_ALERT: <Siren className="w-5 h-5" />,
+};
+
+const alertBg: Record<string, string> = {
+  COMFORTABLE: 'bg-emerald-50 border-emerald-200',
+  YELLOW_ALERT: 'bg-yellow-50 border-yellow-200',
+  ORANGE_ALERT: 'bg-orange-50 border-orange-200',
+  RED_ALERT: 'bg-red-50 border-red-200',
+};
+
+const alertText: Record<string, string> = {
+  COMFORTABLE: 'text-emerald-700',
+  YELLOW_ALERT: 'text-yellow-700',
+  ORANGE_ALERT: 'text-orange-700',
+  RED_ALERT: 'text-red-700',
+};
+
+const alertIconBg: Record<string, string> = {
+  COMFORTABLE: 'bg-emerald-100 text-emerald-600',
+  YELLOW_ALERT: 'bg-yellow-100 text-yellow-600',
+  ORANGE_ALERT: 'bg-orange-100 text-orange-600',
+  RED_ALERT: 'bg-red-100 text-red-600',
+};
+
 export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* AI Analysis Column */}
       <div className="lg:col-span-2 space-y-6">
+
+        {/* IDT Alert Table — Grid of 4 cards */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-800 mb-5 uppercase tracking-widest border-b border-slate-100 pb-3">
+            Tabela de Alertas IDT (Índice de Desconforto Térmico)
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {IDT_ALERT_TABLE.map((alert) => (
+              <motion.div
+                key={alert.level}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "rounded-xl border p-4 flex gap-3 transition-all",
+                  alertBg[alert.level]
+                )}
+              >
+                <div className={cn("p-2 h-fit rounded-lg shrink-0", alertIconBg[alert.level])}>
+                  {alertIcons[alert.level]}
+                </div>
+                <div>
+                  <h4 className={cn("font-bold text-sm tracking-tight mb-0.5", alertText[alert.level])}>
+                    {alert.label}
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    {alert.condition}
+                  </p>
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    {alert.action}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* AI Analysis */}
         <div className="bg-blue-900 rounded-xl p-8 text-white shadow-xl relative overflow-hidden group">
           <div className="absolute -right-20 -top-20 w-80 h-80 bg-blue-800 rounded-full blur-3xl opacity-50" />
           
@@ -54,6 +119,7 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
           </div>
         </div>
 
+        {/* Protocols and Recommendations */}
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-xs font-bold text-slate-800 mb-6 uppercase tracking-widest border-b border-slate-100 pb-3">Protocolos e Medidas Preventivas</h3>
           
@@ -99,15 +165,13 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
             )}
           </div>
 
+          {/* Iniciativa do Projeto */}
           <div className="mt-8 pt-6 border-t border-slate-100">
-            <h4 className="text-xs font-bold text-slate-800 mb-4 uppercase tracking-widest">Parceiros Estratégicos</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 uppercase">Defesa Civil</span>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 uppercase">Sec. Municipal Saúde</span>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 uppercase">Urbanismo - SEUMA</span>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 uppercase">AMC (Trânsito)</span>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 uppercase">Funceme</span>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 uppercase">Univ. Federal (UFC)</span>
+            <h4 className="text-xs font-bold text-slate-800 mb-4 uppercase tracking-widest">Iniciativa do Projeto</h4>
+            <div className="flex">
+              <span className="text-xs font-black text-blue-700 bg-blue-50 px-4 py-3 rounded-lg border border-blue-100 uppercase tracking-widest w-full text-center">
+                Defesa Civil de Fortaleza
+              </span>
             </div>
           </div>
         </div>
@@ -121,15 +185,15 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
             <div className="flex gap-3">
               <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">01</div>
               <div>
-                <p className="text-xs font-bold text-slate-800 uppercase tracking-tighter leading-none mb-1">Linha de Base Dinâmica</p>
-                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Baseline calculada em tempo real com base no nó mais resfriado da malha urbana.</p>
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-tighter leading-none mb-1">Estação de Referência (ICU)</p>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">ICU calculada comparando cada estação urbana com o ponto de controle térmico dinâmico da cidade (estação mais fria), conforme ICU = T_urbana − T_referência.</p>
               </div>
             </div>
             <div className="flex gap-3">
               <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">02</div>
               <div>
-                <p className="text-xs font-bold text-slate-800 uppercase tracking-tighter leading-none mb-1">Índice de Calor (HI)</p>
-                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Cruzamento de Humidade e Temperatura via algoritmo de Steadman-Rothfusz.</p>
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-tighter leading-none mb-1">IDT — Fórmula de Thom</p>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Índice de Desconforto Térmico via fórmula IDT = T − (0.55 − 0.0055×UR) × (T − 14.5), classificado em 4 níveis de alerta.</p>
               </div>
             </div>
           </div>

@@ -6,9 +6,10 @@
 import React, { useState } from 'react';
 import { Radio, Plus, Satellite, MapPin, Thermometer, Droplets } from 'lucide-react';
 import { StationData } from '../../types';
+import { getAlertInfo } from '../../lib/utils';
 
 interface IoTManagerProps {
-  onAddSensor: (sensor: Omit<StationData, 'id' | 'delta' | 'status' | 'heatIndex' | 'avgAnomaly'>) => void;
+  onAddSensor: (sensor: Omit<StationData, 'id' | 'icu' | 'status' | 'idt' | 'avgAnomaly' | 'isReference'>) => void;
   stations: StationData[];
 }
 
@@ -163,30 +164,43 @@ export const IoTManager: React.FC<IoTManagerProps> = ({ onAddSensor, stations })
                 <p className="font-bold uppercase tracking-widest text-xs">Nenhum sensor customizado na malha</p>
               </div>
             ) : (
-              iotStations.map(station => (
-                <div key={station.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-5 group hover:border-blue-200 transition-all">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h4 className="font-black text-slate-800 tracking-tight">{station.name}</h4>
-                      <p className="text-[10px] font-mono text-slate-400">{station.lat.toFixed(4)}, {station.lng.toFixed(4)}</p>
+              iotStations.map(station => {
+                const alertInfo = getAlertInfo(station.status);
+                return (
+                  <div key={station.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-5 group hover:border-blue-200 transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-black text-slate-800 tracking-tight">{station.name}</h4>
+                        <p className="text-[10px] font-mono text-slate-400">{station.lat.toFixed(4)}, {station.lng.toFixed(4)}</p>
+                      </div>
+                      <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-400" />
                     </div>
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0,0,8px,rgba(16,185,129,0.5)]" />
+                    
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="text-3xl font-black text-slate-800 tracking-tight">{station.temp.toFixed(1)}°C</p>
+                        <p className="text-[10px] font-bold text-blue-500 uppercase flex items-center gap-1">
+                          <Droplets className="w-3 h-3" /> {station.humidity}% Umid
+                        </p>
+                        {/* IDT display with colored badge */}
+                        <p className="mt-1 text-[10px] font-bold uppercase flex items-center gap-1.5">
+                          <span
+                            className="inline-block w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: alertInfo.color }}
+                          />
+                          <span style={{ color: alertInfo.color }}>
+                            IDT: {station.idt}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">ICU (vs Ref.)</p>
+                        <p className="text-sm font-black text-red-500">+{station.icu}°C</p>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="text-3xl font-black text-slate-800 tracking-tight">{station.temp.toFixed(1)}°C</p>
-                      <p className="text-[10px] font-bold text-blue-500 uppercase flex items-center gap-1">
-                        <Droplets className="w-3 h-3" /> {station.humidity}% Umid
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Delta Relativo</p>
-                      <p className="text-sm font-black text-red-500">+{station.delta}°C</p>
-                    </div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

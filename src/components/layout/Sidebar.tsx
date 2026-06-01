@@ -75,7 +75,11 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-bold text-emerald-400">ONLINE</span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500">v3.2</span>
+            <span className="text-[10px] font-mono text-slate-500">v4.0</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-700/50 text-[9px] text-slate-500 font-medium space-y-1">
+            <p>IDT (Thom) + ICU + IDW</p>
+            <p>Modelo Holt ativo</p>
           </div>
         </div>
       </div>
