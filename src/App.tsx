@@ -16,12 +16,13 @@ import { TechnicalManual } from './components/analysis/TechnicalManual';
 import { useWeatherSimulation } from './hooks/useWeatherSimulation';
 import { TabType } from './types';
 import { motion, AnimatePresence } from 'motion/react';
+import { HISTORICAL_BASELINES } from './constants';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
   const { stations, aiReport, loadingAI, addSensor, isLive } = useWeatherSimulation();
 
-  // Calcular ponto mais quente, mais frio e a amplitude térmica da rede
+  // Calcular ponto mais quente, mais frio e a amplitude térmica da rede (tempo real)
   const sortedByTemp = useMemo(() => {
     // Filtrar IoT ou qualquer estação válida
     return [...stations].sort((a, b) => b.temp - a.temp);
@@ -34,6 +35,22 @@ export default function App() {
     if (!hottestStation || !coolestStation) return 0;
     return parseFloat((hottestStation.temp - coolestStation.temp).toFixed(1));
   }, [hottestStation, coolestStation]);
+
+  // Calcular métricas com base no histórico de 15 dias para o Ponto de Atenção
+  const stationsWithHistory = useMemo(() => {
+    return stations.map(s => ({
+      ...s,
+      historyAvg: HISTORICAL_BASELINES[s.id] || s.temp // usa a temperatura atual se não houver baseline (IoT novo)
+    })).sort((a, b) => b.historyAvg - a.historyAvg);
+  }, [stations]);
+
+  const hottestHistoryStation = stationsWithHistory[0];
+  const coolestHistoryStation = stationsWithHistory[stationsWithHistory.length - 1];
+
+  const historyTempDiff = useMemo(() => {
+    if (!hottestHistoryStation || !coolestHistoryStation) return 0;
+    return parseFloat((hottestHistoryStation.historyAvg - coolestHistoryStation.historyAvg).toFixed(1));
+  }, [hottestHistoryStation, coolestHistoryStation]);
 
   const getPageTitle = () => {
     switch (activeTab) {
@@ -64,26 +81,26 @@ export default function App() {
               >
                 {/* Metric Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {stations.slice(0, 3).map(station => (
+                  {sortedByTemp.slice(0, 3).map(station => (
                     <WeatherCard key={station.id} station={station} />
                   ))}
                   <div className="bg-white border-2 border-orange-600 p-5 rounded-xl shadow-md flex flex-col justify-between group hover:bg-orange-50 transition-colors">
                     <div>
-                      <p className="text-[11px] font-bold text-orange-700 uppercase tracking-widest leading-none mb-2">Ponto de Atenção / Área Crítica</p>
+                      <p className="text-[11px] font-bold text-orange-700 uppercase tracking-widest leading-none mb-2">Ponto de Atenção (15 Dias)</p>
                       <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tighter">
-                        {hottestStation?.primaryArea || 'Centro'}
+                        {hottestHistoryStation?.primaryArea || 'Centro'}
                       </h3>
                       <p className="text-[9px] text-slate-500 font-bold mt-1 uppercase tracking-tighter">
-                        Temp. Máxima: {hottestStation?.temp}°C
+                        Acumulado 15d: {hottestHistoryStation?.historyAvg.toFixed(1)}°C
                       </p>
                     </div>
                     <div className="mt-4 pt-3 border-t border-slate-100">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-black text-orange-800 uppercase tracking-wider">Gradiente Térmico</span>
-                        <span className="text-sm font-mono font-bold text-orange-700">+{tempDiff}°C</span>
+                        <span className="text-[10px] font-black text-orange-800 uppercase tracking-wider">Gradiente (15 Dias)</span>
+                        <span className="text-sm font-mono font-bold text-orange-700">+{historyTempDiff}°C</span>
                       </div>
                       <p className="text-[9px] text-slate-400 font-medium leading-tight">
-                        {hottestStation?.name} ({hottestStation?.temp}°C) vs {coolestStation?.name} ({coolestStation?.temp}°C)
+                        {hottestHistoryStation?.name} ({hottestHistoryStation?.historyAvg.toFixed(1)}°C) vs {coolestHistoryStation?.name} ({coolestHistoryStation?.historyAvg.toFixed(1)}°C)
                       </p>
                     </div>
                   </div>
