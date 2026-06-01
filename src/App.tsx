@@ -150,7 +150,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 className="pb-10 space-y-8"
               >
-                <HistoricalChart />
+                <HistoricalChart stations={stations} />
                 <TechnicalManual />
               </motion.div>
             )}
