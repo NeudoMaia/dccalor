@@ -4,13 +4,13 @@
  */
 
 /**
- * Níveis de alerta baseados no IDT (Índice de Desconforto Térmico - Thom)
- * COMFORTABLE:   IDT < 24   — Monitoramento padrão
- * YELLOW_ALERT:  IDT 24–27  — Hidratação recomendada
- * ORANGE_ALERT:  IDT 28–29  — Evitar exposição solar
- * RED_ALERT:     IDT ≥ 30   — Emergência médica iminente
+ * Níveis de alerta baseados no Índice de Calor (Heat Index) para Fortaleza
+ * NIVEL_0:  HI ≤ 27°C      — Nível 0 (Seguro/Rotina)
+ * NIVEL_1:  HI 27.1–32°C   — Nível 1 (ATENÇÃO / Cuidado)
+ * NIVEL_2:  HI 32.1–41°C   — Nível 2 (ALERTA / Cuidado Extremo)
+ * NIVEL_3:  HI > 41.1°C    — Nível 3 (ALARME / Perigo a Perigo Extremo)
  */
-export type HeatLevel = 'COMFORTABLE' | 'YELLOW_ALERT' | 'ORANGE_ALERT' | 'RED_ALERT';
+export type HeatLevel = 'NIVEL_0' | 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | 'OFFLINE';
 
 export interface StationData {
   id: string;
@@ -19,7 +19,9 @@ export interface StationData {
   lng: number;
   temp: number;
   humidity: number;
-  /** Índice de Desconforto Térmico (Fórmula de Thom) */
+  windSpeed: number; // m/s
+  solarRadiation: number; // W/m²
+  /** Índice de Desconforto Térmico (Agora como Temperatura Aparente de Steadman) */
   idt: number;
   /** Intensidade da Ilha de Calor Urbana: T_urbana − T_referência */
   icu: number;

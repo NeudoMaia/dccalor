@@ -44,8 +44,20 @@ export const TechnicalManual: React.FC = () => {
               o sistema identifica dinamicamente a estação mais fria da rede no ciclo de leitura (T_mín) como controle natural. 
               A intensidade da ICU de cada bairro é dada por <code className="bg-slate-100 px-1 rounded text-xs">ICU = T_urbana − T_mín</code>. 
               O conforto térmico é calibrado especificamente para Fortaleza: zona de conforto ajustada para **24°C a 27°C** devido à aclimatação local, 
-              alertando para **fadiga térmica** em umidades elevadas (&gt;70%, que impedem a evaporação do suor) e incorporando o **efeito refrigerante dos ventos alísios** (que aumentam o conforto térmico cutâneo).
+              </p>
+              <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+              O sistema baseia-se na formulação da <strong>Temperatura Aparente de Steadman (1994)</strong>, um índice universal que consolida a Temperatura do Ar, Umidade Relativa, Velocidade do Vento e Radiação Solar incidente em um único valor representativo do estresse térmico humano.
             </p>
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4 font-mono text-xs overflow-x-auto text-slate-700">
+              e = (RH / 100) * 6.105 * exp(17.27 * Ta / (237.7 + Ta))<br/>
+              AT = Ta + 0.348 * e - 0.70 * ws + 0.70 * (Q / (ws + 10)) - 4.25
+            </div>
+            <ul className="text-sm text-slate-600 space-y-2 list-disc pl-5">
+              <li><strong>Ta:</strong> Temperatura do Ar (°C) coletada pelos sensores</li>
+              <li><strong>e:</strong> Pressão de vapor d'água (hPa) baseada na Umidade Relativa (RH)</li>
+              <li><strong>ws:</strong> Velocidade do Vento (m/s) a 10m de altura (convecção térmica)</li>
+              <li><strong>Q:</strong> Radiação Solar Incidente (W/m²) limitando o resfriamento cutâneo</li>
+            </ul>
           </div>
 
           {/* Seção Variáveis */}
@@ -70,10 +82,16 @@ export const TechnicalManual: React.FC = () => {
             </h3>
             <div className="bg-slate-50 p-4 rounded-lg font-mono text-xs text-slate-700 space-y-3">
               <div>
-                <p><strong>IDT — Índice de Desconforto Térmico (Thom):</strong></p>
-                <code>IDT = T − (0.55 − 0.0055 × UR) × (T − 14.5)</code>
+                <p><strong>Sensação Térmica / Índice de Calor (NOAA / Rothfusz):</strong></p>
+                <code>HI = f(T, UR) → Regressão de Rothfusz (Conversão p/ °C)</code>
+                <div className="mt-2 text-[11px] text-slate-500 font-sans leading-relaxed">
+                  <strong>Onde:</strong><br />
+                  • <strong>T (Temperatura Real):</strong> Temperatura do ar em °C captada fisicamente pelos sensores.<br />
+                  • <strong>UR (Umidade Relativa):</strong> Percentual de vapor de água no ar (%).<br />
+                  <strong>Como chegamos a esse número:</strong> A fórmula atualizada utiliza a Regressão do Serviço Meteorológico dos EUA (NOAA). Em climas muito úmidos e quentes como o de Fortaleza, a evaporação do suor (nosso mecanismo de resfriamento) é severamente inibida, o que faz o corpo reter calor. A fórmula reflete essa realidade projetando um número (Sensação) que, nestes cenários, é <strong>sempre maior</strong> que a temperatura real do ar. Ex: 32°C com 70% UR equivale a uma sensação superior a 40°C.
+                </div>
               </div>
-              <div>
+              <div className="pt-3 border-t border-slate-200">
                 <p><strong>ICU — Intensidade da Ilha de Calor:</strong></p>
                 <code>ICU = T_urbana − T_referência</code>
               </div>
@@ -89,9 +107,15 @@ export const TechnicalManual: React.FC = () => {
                 <br />
                 <code>F_{"t+m"} = S_t + m·b_t</code>
               </div>
-              <p className="mt-2 text-[10px] text-slate-500 italic">
-                *Classificação de Alerta: {"<"}24°C Confortável | 24–27°C Alerta Amarelo | 28–29°C Alerta Laranja | ≥30°C Alerta Vermelho
-              </p>
+              <div className="mt-3 pt-3 border-t border-slate-200 font-sans">
+                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mb-1">Classificação Oficial de Alerta (Defesa Civil):</p>
+                <p className="text-[10px] text-slate-500 italic leading-relaxed">
+                  🟢 <strong>Nível 0:</strong> Sensação ≤ 27°C (Seguro) | 
+                  🟡 <strong>Nível 1:</strong> 27.1 a 32°C (Atenção) <br/>
+                  🟠 <strong>Nível 2:</strong> 32.1 a 41°C (Alerta) | 
+                  🔴 <strong>Nível 3:</strong> &gt; 41.1°C (Alarme - Risco de Colapso Térmico)
+                </p>
+              </div>
             </div>
           </div>
         </div>

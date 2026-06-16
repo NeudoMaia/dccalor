@@ -119,10 +119,11 @@ function IDWOverlay({ stations }: { stations: StationData[] }) {
 export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
   const getCircleColor = (status: string) => {
     switch (status) {
-      case 'COMFORTABLE': return '#10b981';
-      case 'YELLOW_ALERT': return '#eab308';
-      case 'ORANGE_ALERT': return '#f97316';
-      case 'RED_ALERT': return '#dc2626';
+      case 'NIVEL_0': return '#10b981';
+      case 'NIVEL_1': return '#eab308';
+      case 'NIVEL_2': return '#f97316';
+      case 'NIVEL_3': return '#dc2626';
+      case 'OFFLINE': return '#64748b';
       default: return '#10b981';
     }
   };
@@ -148,8 +149,8 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
               <Popup>
                 <div className="p-1">
                   <h4 className="font-bold text-slate-800 m-0">{station.name}</h4>
-                  <p className="text-xs text-slate-500 m-0 mt-1">Temp: {station.temp}°C</p>
-                  <p className="text-xs text-slate-500 m-0">IDT: {station.idt}</p>
+                  <p className="text-xs text-slate-500 m-0 mt-1">Temp. Real: {station.temp}°C</p>
+                  <p className="text-xs text-slate-500 m-0">Sensação Térmica: {station.idt.toFixed(1)}°C</p>
                   <p className="text-xs text-slate-500 m-0">ICU: +{station.icu}°C</p>
                 </div>
               </Popup>
@@ -175,19 +176,19 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0,0,8px,rgba(16,185,129,0.5)]"></span>
-            <span className="font-bold text-slate-600">Confortável ({"<"} 24°C)</span>
+            <span className="font-bold text-slate-600">Nível 0 - Seguro (≤ 27°C)</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-yellow-500 shadow-[0,0,8px,rgba(234,179,8,0.5)]"></span>
-            <span className="font-bold text-slate-600">Alerta Amarelo (24°C–27°C)</span>
+            <span className="font-bold text-slate-600">Nível 1 - Atenção (27.1°C–32°C)</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-orange-500 shadow-[0,0,8px,rgba(249,115,22,0.5)]"></span>
-            <span className="font-bold text-slate-600">Alerta Laranja (28°C–29°C)</span>
+            <span className="font-bold text-slate-600">Nível 2 - Alerta (32.1°C–41°C)</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-red-600 shadow-[0,0,8px,rgba(220,38,38,0.5)]"></span>
-            <span className="font-bold text-slate-600">Alerta Vermelho (≥ 30°C)</span>
+            <span className="font-bold text-slate-600">Nível 3 - Alarme (≥ 41.1°C)</span>
           </div>
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-200">
             <span className="w-3 h-3 rounded-full border-2 border-blue-500 border-dashed"></span>

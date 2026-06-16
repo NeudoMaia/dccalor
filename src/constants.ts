@@ -26,7 +26,9 @@ export const INITIAL_STATIONS: StationData[] = [
     lng: -38.49,
     temp: 29.5,
     humidity: 65,
-    idt: calculateIDT(29.5, 65),         // IDT Thom
+    windSpeed: 2.5,
+    solarRadiation: 800,
+    idt: calculateIDT(29.5, 65, 2.5, 800),         // IDT Steadman
     icu: calculateICU(29.5, REF_TEMP),   // ICU = 0 (é a referência)
     avgAnomaly: 0,
     status: getStatusFromIDT(29.5),
@@ -41,7 +43,9 @@ export const INITIAL_STATIONS: StationData[] = [
     lng: -38.54,
     temp: 30.2,
     humidity: 60,
-    idt: calculateIDT(30.2, 60),
+    windSpeed: 2.0,
+    solarRadiation: 850,
+    idt: calculateIDT(30.2, 60, 2.0, 850),
     icu: calculateICU(30.2, REF_TEMP),
     avgAnomaly: 0,
     status: getStatusFromIDT(30.2),
@@ -55,7 +59,9 @@ export const INITIAL_STATIONS: StationData[] = [
     lng: -38.52,
     temp: 31.0,
     humidity: 58,
-    idt: calculateIDT(31.0, 58),
+    windSpeed: 1.5,
+    solarRadiation: 900,
+    idt: calculateIDT(31.0, 58, 1.5, 900),
     icu: calculateICU(31.0, REF_TEMP),
     avgAnomaly: 0,
     status: getStatusFromIDT(31.0),

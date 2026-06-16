@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Droplets, Info } from 'lucide-react';
+import { Droplets, Info, Wind, Sun } from 'lucide-react';
 import { StationData } from '../../types';
 import { cn, formatTemp, getAlertInfo } from '../../lib/utils';
 import { motion } from 'motion/react';
@@ -14,10 +14,11 @@ interface WeatherCardProps {
 }
 
 export const WeatherCard: React.FC<WeatherCardProps> = ({ station }) => {
-  const isComfortable = station.status === 'COMFORTABLE';
-  const isYellow = station.status === 'YELLOW_ALERT';
-  const isOrange = station.status === 'ORANGE_ALERT';
-  const isRed = station.status === 'RED_ALERT';
+  const isComfortable = station.status === 'NIVEL_0';
+  const isYellow = station.status === 'NIVEL_1';
+  const isOrange = station.status === 'NIVEL_2';
+  const isRed = station.status === 'NIVEL_3';
+  const isOffline = station.status === 'OFFLINE';
 
   const alertInfo = getAlertInfo(station.status);
 
@@ -59,18 +60,31 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ station }) => {
       </div>
 
       <div className="flex items-end gap-3 my-4">
-        <h2 className={cn(
-          "text-4xl font-light tracking-tighter",
-          isRed ? "text-rose-600" :
-          isOrange ? "text-orange-600" :
-          isYellow ? "text-yellow-600" :
-          "text-slate-800"
-        )}>
-          {station.temp.toFixed(1)} <span className="text-lg font-medium text-slate-300">°C</span>
-        </h2>
-        <div className="text-xs font-bold text-slate-400 mb-1.5 flex items-center gap-1 uppercase tracking-tighter">
-          <Droplets className="w-3.5 h-3.5 text-blue-400" />
-          <span>{station.humidity}% RH</span>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Temperatura Real</span>
+          <h2 className={cn(
+            "text-4xl font-light tracking-tighter",
+            isRed ? "text-rose-600" :
+            isOrange ? "text-orange-600" :
+            isYellow ? "text-yellow-600" :
+            "text-slate-800"
+          )}>
+            {station.temp.toFixed(1)} <span className="text-lg font-medium text-slate-300">°C</span>
+          </h2>
+        </div>
+        <div className="flex flex-col gap-1.5 mb-1.5 ml-auto text-right">
+          <div className="text-xs font-bold text-slate-400 flex items-center justify-end gap-1.5 uppercase tracking-tighter">
+            <span>{station.humidity}% RH</span>
+            <Droplets className="w-3.5 h-3.5 text-blue-400" />
+          </div>
+          <div className="text-xs font-bold text-slate-400 flex items-center justify-end gap-1.5 uppercase tracking-tighter">
+            <span>{station.windSpeed.toFixed(1)} m/s</span>
+            <Wind className="w-3.5 h-3.5 text-slate-400" />
+          </div>
+          <div className="text-xs font-bold text-slate-400 flex items-center justify-end gap-1.5 uppercase tracking-tighter">
+            <span>{station.solarRadiation.toFixed(0)} W/m²</span>
+            <Sun className="w-3.5 h-3.5 text-amber-500" />
+          </div>
         </div>
       </div>
 
@@ -81,7 +95,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ station }) => {
         isYellow ? "bg-yellow-50/30 border-yellow-100" :
         "bg-slate-50/50 border-slate-100"
       )}>
-        <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">IDT (Thom)</span>
+        <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Temp. Aparente (Steadman)</span>
         <span className={cn(
           "font-bold text-sm font-mono",
           isRed ? "text-red-700" :

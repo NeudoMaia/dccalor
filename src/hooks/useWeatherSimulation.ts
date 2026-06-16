@@ -67,19 +67,31 @@ export function useWeatherSimulation() {
         const newTemp = Math.max(25, station.temp + tempVariation);
         const newHumidity = Math.max(30, Math.min(95, station.humidity + humidityVariation));
         
+        const windVariation = (Math.random() * 0.4) - 0.2;
+        const newWind = Math.max(0, (station.windSpeed || 2.0) + windVariation);
+        
+        // Simulação bem simples do ciclo solar diário
+        const hour = new Date().getHours();
+        const baseSolar = hour >= 6 && hour <= 17 
+          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (hour - 6) / 11)))
+          : 0;
+        const newSolar = Math.max(0, baseSolar + (Math.random() * 50 - 25));
+        
         return {
           ...station,
           temp: parseFloat(newTemp.toFixed(1)),
           humidity: newHumidity,
+          windSpeed: parseFloat(newWind.toFixed(1)),
+          solarRadiation: parseFloat(newSolar.toFixed(0))
         };
       });
 
       // 3. Obter temperatura da referência Messejana
       const refTemp = updated.find(s => s.isReference)?.temp ?? updated[0].temp;
 
-      // 4. Recalcular IDT (Thom), ICU e anomalia para cada estação
+      // 4. Recalcular IDT (Steadman), ICU e anomalia para cada estação
       return updated.map(s => {
-        const idt = calculateIDT(s.temp, s.humidity);
+        const idt = calculateIDT(s.temp, s.humidity, s.windSpeed, s.solarRadiation);
         const icu = calculateICU(s.temp, refTemp);
         const baseline = HISTORICAL_BASELINES[s.id] ?? 29.0;
         const avgAnomaly = calculateAnomaly(s.temp, baseline);
@@ -130,13 +142,17 @@ export function useWeatherSimulation() {
   }, []);
 
   // F. Adicionar sensores customizados da rede IoT
-  const addSensor = (sensor: Omit<StationData, 'id' | 'icu' | 'status' | 'idt' | 'avgAnomaly' | 'isReference'>) => {
+  const addSensor = (sensor: Omit<StationData, 'id' | 'icu' | 'status' | 'idt' | 'avgAnomaly' | 'isReference' | 'windSpeed' | 'solarRadiation'>) => {
     const refTemp = apiStations.find(s => s.isReference)?.temp ?? apiStations[0]?.temp ?? 29.5;
-    const idt = calculateIDT(sensor.temp, sensor.humidity);
+    const windSpeed = 2.0;
+    const solarRadiation = 500;
+    const idt = calculateIDT(sensor.temp, sensor.humidity, windSpeed, solarRadiation);
     
     const newSensor: StationData = {
       ...sensor,
       id: `iot-${Date.now()}`,
+      windSpeed,
+      solarRadiation,
       idt,
       icu: calculateICU(sensor.temp, refTemp),
       avgAnomaly: 0,

@@ -12,16 +12,23 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * IDT — Índice de Desconforto Térmico (Fórmula de Thom)
- * IDT = T − (0.55 − 0.0055 × UR) × (T − 14.5)
- *
- * Onde:
- *   T  = Temperatura do ar em °C
- *   UR = Umidade Relativa em %
+ * Temperatura Aparente (Apparent Temperature - Modelo Steadman)
+ * Considera Temperatura (Ta), Umidade (rh) e Velocidade do Vento (ws em m/s)
+ * Formula de Sombra: AT = Ta + 0.33 * e - 0.70 * ws - 4.00
+ * Onde 'e' é a pressão de vapor d'água.
+ * OBS: A fórmula com radiação solar ao sol foi removida, pois exigiria
+ * a radiação líquida absorvida pelo corpo humano, e não a radiação global crua em W/m²,
+ * o que estava causando distorções (sensação > 70°C).
  */
-export function calculateIDT(temp: number, humidity: number): number {
-  const idt = temp - (0.55 - 0.0055 * humidity) * (temp - 14.5);
-  return parseFloat(idt.toFixed(1));
+export function calculateIDT(tempC: number, rh: number, windSpeed: number = 0, solarRad: number = 0): number {
+  // 1. Calcula a pressão de vapor d'água (e) em hPa
+  const e = (rh / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
+  
+  // 2. Calcula a Temperatura Aparente (Steadman - Sombra)
+  const at = tempC + 0.33 * e - 0.70 * windSpeed - 4.00;
+  
+  // Evitar que o cálculo fique menor que a temperatura real de forma muito drástica em Fortaleza
+  return parseFloat(Math.max(tempC, at).toFixed(1));
 }
 
 /**
@@ -40,51 +47,57 @@ export function formatTemp(temp: number): string {
 }
 
 /**
- * Classificação do status baseado nos limiares de temperatura do ar (°C)
+ * Classificação do status baseado no Índice de Calor (HI) para Fortaleza
  *
  * | Temperatura | Condição                                     |
  * |-------------|----------------------------------------------|
- * | < 24°C      | Confortável — Monitoramento padrão           |
- * | 24 a 27°C   | Alerta Amarelo — Hidratação recomendada       |
- * | 28 a 29°C   | Alerta Laranja — Evitar exposição solar       |
- * | ≥ 30°C      | Alerta Vermelho — Emergência médica iminente  |
+ * | ≤ 27°C      | Nível 0 (Seguro/Rotina)                      |
+ * | 27.1 a 32°C | Nível 1 (Atenção / Cuidado)                  |
+ * | 32.1 a 41°C | Nível 2 (Alerta / Cuidado Extremo)           |
+ * | > 41.1°C    | Nível 3 (Alarme / Perigo a Perigo Extremo)   |
  */
 export function getStatusFromIDT(temp: number): HeatLevel {
-  if (temp < 24) return 'COMFORTABLE';
-  if (temp < 28) return 'YELLOW_ALERT';
-  if (temp < 30) return 'ORANGE_ALERT';
-  return 'RED_ALERT';
+  if (temp <= 27) return 'NIVEL_0';
+  if (temp <= 32) return 'NIVEL_1';
+  if (temp <= 41.1) return 'NIVEL_2';
+  return 'NIVEL_3';
 }
-
 /** Tabela de alertas IDT com ações mitigatórias */
 export const IDT_ALERT_TABLE: IDTAlertInfo[] = [
   {
-    level: 'COMFORTABLE',
-    label: 'Confortável',
-    condition: 'Temp < 24°C',
-    action: 'Monitoramento padrão.',
-    color: '#10b981'
+    level: 'NIVEL_0',
+    label: 'Nível 0 - Seguro',
+    condition: 'HI ≤ 27°C',
+    action: 'Monitoramento padrão. Sem impactos esperados.',
+    color: '#10b981' // Verde
   },
   {
-    level: 'YELLOW_ALERT',
-    label: 'Alerta Amarelo',
-    condition: 'Temp 24°C – 27°C',
-    action: 'Hidratação recomendada. Mais da metade da população sente desconforto.',
-    color: '#eab308'
+    level: 'NIVEL_1',
+    label: 'Nível 1 - Atenção',
+    condition: 'HI 27.1°C – 32°C',
+    action: 'Possível fadiga com exposição prolongada. Requer envio de informes preventivos.',
+    color: '#eab308' // Amarelo
   },
   {
-    level: 'ORANGE_ALERT',
-    label: 'Alerta Laranja',
-    condition: 'Temp 28°C – 29°C',
-    action: 'Evitar exposição solar. Desconforto severo e risco à saúde.',
-    color: '#f97316'
+    level: 'NIVEL_2',
+    label: 'Nível 2 - Alerta',
+    condition: 'HI 32.1°C – 41°C',
+    action: 'Risco de insolação, cãibras. Pausas no trabalho externo entre 13h e 17h, preparar rede de saúde.',
+    color: '#f97316' // Laranja
   },
   {
-    level: 'RED_ALERT',
-    label: 'Alerta Vermelho',
-    condition: 'Temp ≥ 30°C',
-    action: 'Emergência médica iminente. Mobilização de abrigos e postos de hidratação.',
-    color: '#dc2626'
+    level: 'NIVEL_3',
+    label: 'Nível 3 - Alarme',
+    condition: 'HI > 41.1°C',
+    action: 'Emergência. Risco de AVC. Suspensão de trabalho externo e abertura de pontos de resfriamento.',
+    color: '#dc2626' // Vermelho
+  },
+  {
+    level: 'OFFLINE',
+    label: 'Sensor Offline',
+    condition: 'Falha/Espúrio',
+    action: 'Verificar conexão do sensor.',
+    color: '#64748b' // Cinza
   }
 ];
 

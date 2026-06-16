@@ -5,6 +5,8 @@ interface StationData {
   lng: number;
   temp: number;
   humidity: number;
+  windSpeed: number;
+  solarRadiation: number;
   idt: number;
   icu: number;
   avgAnomaly: number;
@@ -94,20 +96,21 @@ const STATION_BASELINES: Record<number, number> = {
 };
 
 // 2. Fórmulas de cálculo locais para robustez do serverless
-function computeIDT(temp: number, humidity: number): number {
-  const idt = temp - (0.55 - 0.0055 * humidity) * (temp - 14.5);
-  return parseFloat(idt.toFixed(1));
+function computeIDT(tempC: number, rh: number, windSpeed: number = 0, solarRad: number = 0): number {
+  const e = (rh / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
+  const at = tempC + 0.348 * e - 0.70 * windSpeed + 0.70 * (solarRad / (windSpeed + 10)) - 4.25;
+  return parseFloat(at.toFixed(1));
 }
 
 function computeICU(temp: number, refTemp: number): number {
   return parseFloat((temp - refTemp).toFixed(1));
 }
 
-function computeStatus(temp: number): string {
-  if (temp < 24) return 'COMFORTABLE';
-  if (temp < 28) return 'YELLOW_ALERT';
-  if (temp < 30) return 'ORANGE_ALERT';
-  return 'RED_ALERT';
+function computeStatus(idt: number): string {
+  if (idt <= 27) return 'NIVEL_0';
+  if (idt <= 32) return 'NIVEL_1';
+  if (idt <= 41.1) return 'NIVEL_2';
+  return 'NIVEL_3';
 }
 
 // 3. Credenciais padrão de fallback seguro
@@ -198,9 +201,25 @@ export default async function handler(req: any, res: any) {
         continue;
       }
 
-      const temp = dev.dashboard?.temp ?? 28.0;
-      const humidity = dev.dashboard?.humi ?? 70;
-      const idt = computeIDT(temp, humidity);
+      let temp = dev.dashboard?.temp ?? 28.0;
+      let humidity = dev.dashboard?.humi ?? 70;
+
+      // Vento e Radiação do Plugfield (fallback para simulado se não existir)
+      let windSpeed = dev.dashboard?.windSpeed ?? parseFloat((2.0 + Math.sin(dev.id) * 1.5).toFixed(1));
+      let solarRadiation = dev.dashboard?.solarRadiation ?? 
+        (new Date().getHours() >= 6 && new Date().getHours() <= 17 
+          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (new Date().getHours() - 6) / 11)))
+          : 0);
+          
+      // [Módulo de Integridade]: Validação de Dados (QC)
+      let isSpurious = false;
+      if (temp < 15 || temp > 50 || humidity < 10 || humidity > 100) {
+        isSpurious = true;
+        temp = STATION_BASELINES[dev.id] ?? 29.0;
+        humidity = 70; 
+      }
+
+      const idt = computeIDT(temp, humidity, windSpeed, solarRadiation);
       const icu = computeICU(temp, minTemp);
       const baseline = STATION_BASELINES[dev.id] ?? 29.0;
       const avgAnomaly = parseFloat((temp - baseline).toFixed(2));
@@ -213,23 +232,22 @@ export default async function handler(req: any, res: any) {
         lng: parseFloat(dev.longitude) || -38.53,
         temp,
         humidity,
+        windSpeed,
+        solarRadiation: parseFloat(solarRadiation.toFixed(1)),
         idt,
         icu,
         avgAnomaly,
-        status: computeStatus(temp),
+        status: isSpurious ? 'OFFLINE' : computeStatus(idt),
         primaryArea: mapping.primaryArea,
         secondaryAreas: mapping.secondaryAreas,
         isReference: isRef
       });
     }
 
-    // Ordenação estável dos 3 primeiros cards de topo (Messejana, Centro, Montese) para consistência visual do Dashboard
+    // Ordenação dinâmica: maiores sensações térmicas (IDT) primeiro, seguido por temperatura real
     processedStations.sort((a, b) => {
-      const order = { '9169': 1, '8642': 2, '8836': 3 } as Record<string, number>;
-      const oA = order[a.id] ?? 99;
-      const oB = order[b.id] ?? 99;
-      if (oA !== oB) return oA - oB;
-      return b.temp - a.temp; // Resto ordena por temperatura decrescente
+      if (b.idt !== a.idt) return b.idt - a.idt;
+      return b.temp - a.temp;
     });
 
     res.status(200).json({
@@ -250,6 +268,11 @@ export default async function handler(req: any, res: any) {
       const hashVal = id % 10;
       const temp = parseFloat((baseline + (Math.sin(Date.now() / 100000 + hashVal) * 1.5)).toFixed(1));
       const humidity = Math.max(30, Math.min(95, Math.round(65 + (Math.cos(Date.now() / 100000 + hashVal) * 10))));
+      const windSpeed = parseFloat((2.5 + Math.sin(Date.now() / 50000 + hashVal) * 1.5).toFixed(1));
+      const hour = new Date().getHours();
+      const solarRadiation = hour >= 6 && hour <= 17 
+          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (hour - 6) / 11)))
+          : 0;
       
       return {
         id: idStr,
@@ -258,10 +281,12 @@ export default async function handler(req: any, res: any) {
         lng: id === 9169 ? -38.48544 : (id === 8642 ? -38.53775 : (id === 8836 ? -38.55831 : -38.53 + (hashVal - 5) * 0.015)),
         temp,
         humidity,
-        idt: computeIDT(temp, humidity),
+        windSpeed,
+        solarRadiation: parseFloat(solarRadiation.toFixed(1)),
+        idt: computeIDT(temp, humidity, windSpeed, solarRadiation),
         icu: 0,
         avgAnomaly: parseFloat((temp - baseline).toFixed(2)),
-        status: "COMFORTABLE",
+        status: computeStatus(computeIDT(temp, humidity, windSpeed, solarRadiation)),
         primaryArea: mapping.primaryArea,
         secondaryAreas: mapping.secondaryAreas,
         isReference: false
@@ -279,23 +304,21 @@ export default async function handler(req: any, res: any) {
     });
 
     const finalSimulated = simulatedStations.map(s => {
-      const idt = computeIDT(s.temp, s.humidity);
+      const idt = computeIDT(s.temp, s.humidity, s.windSpeed, s.solarRadiation);
       const isRef = s.id === minTempIdSim;
       return {
         ...s,
         name: s.name + (isRef ? ' (Ref. Térmica)' : ''),
         idt,
         icu: computeICU(s.temp, minTempSim),
-        status: computeStatus(s.temp),
+        status: computeStatus(idt),
         isReference: isRef
       };
     });
 
+    // Ordenação dinâmica para o fallback
     finalSimulated.sort((a, b) => {
-      const order = { '9169': 1, '8642': 2, '8836': 3 } as Record<string, number>;
-      const oA = order[a.id] ?? 99;
-      const oB = order[b.id] ?? 99;
-      if (oA !== oB) return oA - oB;
+      if (b.idt !== a.idt) return b.idt - a.idt;
       return b.temp - a.temp;
     });
 

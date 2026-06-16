@@ -71,22 +71,31 @@ export default async function handler(req: any, res: any) {
   )).join(', ');
 
   const prompt = `
-    Como um analista especialista em meteorologia urbana e saúde pública da Defesa Civil de Fortaleza,
-    analise os seguintes dados das estações meteorológicas em tempo real: ${stationSummary}.
+[PROMPT DE SISTEMA: MOTOR DE ALERTA CLIMÁTICO - DEFESA CIVIL DE FORTALEZA]
 
-    Seu diagnóstico e relatórios devem ser baseados nas seguintes premissas e LÓGICA TERMAL ESPECÍFICA DE FORTALEZA:
-    1. Aclimatação & Conforto Tropical: Por estarmos em uma região de clima tropical úmido, a zona de conforto térmico da população local é ligeiramente mais alta, situando-se tipicamente entre 24°C e 27°C.
-    2. Impacto da Umidade Relativa: Fortaleza possui umidade média elevada (>70%). Sob alta umidade, o suor não evapora facilmente, bloqueando o resfriamento biológico do corpo e acelerando a fadiga térmica (exemplo: 29°C com 80% de umidade gera estresse térmico correspondente a sensação >33°C).
-    3. Efeito Refrescante dos Ventos Alísios: A ventilação constante atua como um regulador natural. Sob brisa constante (típica dos alísios de Fortaleza), temperaturas de 28°C-29°C tornam-se toleráveis e confortáveis devido à aceleração da evaporação cutânea.
-    4. Adensamento e ICU precoce: As superfícies asfálticas e de concreto em bairros adensados (ex: Centro ou Aldeota) retêm muito mais radiação, fazendo com que ultrapassem os limites saudáveis de conforto muito mais cedo que as áreas litorâneas ou florestadas.
+Contexto e Papel:
+Você é o motor analítico do Observatório de Riscos Climáticos de Fortaleza. Sua função é ingerir dados meteorológicos brutos em tempo real, calcular índices de conforto térmico e gerar produtos de monitoramento, relatórios e alertas escalonados (Atenção, Alerta e Alarme) para o Plano Municipal de Contingência.
 
-    Analise os Índices de Desconforto Térmico (IDT - Thom) e a Intensidade das Ilhas de Calor (ICU = T_urbana − T_mínima).
-    Classifique cada estação conforme: IDT<24=Confortável, 24-27=Alerta Amarelo, 28-29=Alerta Laranja, ≥30=Emergência Médica.
+Dados em tempo real das estações:
+${stationSummary}
 
-    Gere um relatório técnico extremamente conciso (máximo 400 caracteres) aplicando esta lógica termal local e recomende ações imediatas e mitigatórias exclusivas para a Defesa Civil de Fortaleza.
-    As recomendações devem ser classificadas como HEALTH, TRAFFIC ou CIVIL_DEFENSE.
+Regras de Processamento (Aclimatação da População):
+A zona de desconforto crítico em Fortaleza só se inicia a partir de um Índice de Calor (HI) de 32,1°C devido à aclimatação tropical, ventos alísios constantes e umidade. 
 
-    Responda em português.
+Parâmetros de Gatilho e Estabilidade (Thresholds de Segurança):
+Classifique o cenário geral da cidade usando os dados acima nestas faixas:
+- Nível 0 (Seguro/Rotina): HI até 27°C. Sem impactos esperados.
+- Nível 1 (ATENÇÃO / Cuidado): HI entre 27,1°C e 32°C. Possível fadiga. Requer informes preventivos.
+- Nível 2 (ALERTA / Cuidado Extremo): HI entre 32,1°C e 41°C. Risco de insolação. Orientações de saúde necessárias.
+- Nível 3 (ALARME / Perigo Extremo): HI acima de 41,1°C. Risco iminente de colapso térmico.
+
+Regra de Rebaixamento (Anti-Fadiga de Alertas):
+O backend já aplica uma validação de 60 minutos para rebaixar o status de uma estação. Assuma os dados fornecidos como já filtrados e qualificados.
+
+Instruções de Saída:
+Analise os dados e gere um JSON contendo:
+1. "report": Um Resumo Executivo conciso com o Status Atual (Nível mais alto detectado na cidade) e o Bairro mais crítico (se houver atenção).
+2. "recommendations": Uma lista de ações obrigatórias a serem ativadas no momento (ex: hidratação, suspensão de atividades ao ar livre), classificadas por tipo (HEALTH, TRAFFIC, CIVIL_DEFENSE). Responda em português.
   `;
 
   try {
