@@ -98,8 +98,8 @@ const STATION_BASELINES: Record<number, number> = {
 // 2. Fórmulas de cálculo locais para robustez do serverless
 function computeIDT(tempC: number, rh: number, windSpeed: number = 0, solarRad: number = 0): number {
   const e = (rh / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
-  const at = tempC + 0.348 * e - 0.70 * windSpeed + 0.70 * (solarRad / (windSpeed + 10)) - 4.25;
-  return parseFloat(at.toFixed(1));
+  const at = tempC + 0.33 * e - 0.70 * windSpeed - 4.00;
+  return parseFloat(Math.max(tempC, at).toFixed(1));
 }
 
 function computeICU(temp: number, refTemp: number): number {
