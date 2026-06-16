@@ -45,7 +45,7 @@ export const HistoricalChart: React.FC<HistoricalChartProps> = ({ stations }) =>
 
     // 1. Generate dynamic anchored history (30 days) for all stations
     stations.forEach(station => {
-      const history = generateAnchoredHistory(station, 31);
+      const history = generateAnchoredHistory(station, 30);
       const tempValues = history.map(h => h.temp);
       const humValues = history.map(h => h.humidity);
       const windValues = history.map(h => h.windSpeed);
@@ -56,8 +56,8 @@ export const HistoricalChart: React.FC<HistoricalChartProps> = ({ stations }) =>
       
       const idtValues = history.map(h => h.idt);
       
-      predictionsMap.set(station.id, holtPredict(tempValues, 3));
-      idtPredictionsMap.set(station.id, holtPredict(idtValues, 3));
+      predictionsMap.set(station.id, holtPredict(tempValues, 2));
+      idtPredictionsMap.set(station.id, holtPredict(idtValues, 2));
     });
 
     // 3. Assemble the tabular data for Recharts
@@ -65,7 +65,7 @@ export const HistoricalChart: React.FC<HistoricalChartProps> = ({ stations }) =>
     
     // Observed (last 30 days)
     const today = new Date();
-    for (let i = 30; i >= 0; i--) {
+    for (let i = 29; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -75,29 +75,24 @@ export const HistoricalChart: React.FC<HistoricalChartProps> = ({ stations }) =>
       if (selectedStationId === 'all') {
         stations.forEach(station => {
            const history = historyMap.get(station.id);
-           if (history) row[station.id] = history[30 - i];
+           if (history) row[station.id] = history[29 - i];
         });
       } else {
         const history = historyMap.get(selectedStationId);
         if (history) {
-          // Re-generate history to get the exact IDT or just recalculate it 
-          // Wait, we need to pass wind and radiation.
-          // Since we changed how we map history, let's just use generateAnchoredHistory again for simplicity
-          // or we could just use the station object. 
-          // Actually, we can fetch the station and generate its history to extract the IDT.
           const st = stations.find(s => s.id === selectedStationId);
           if (st) {
-            const hist = generateAnchoredHistory(st, 31);
-            row['Temperatura Real'] = hist[30 - i].temp;
-            row['Temp. Aparente (Steadman)'] = hist[30 - i].idt;
+            const hist = generateAnchoredHistory(st, 30);
+            row['Temperatura Real'] = hist[29 - i].temp;
+            row['Temp. Aparente (Steadman)'] = hist[29 - i].idt;
           }
         }
       }
       finalData.push(row);
     }
     
-    // Predicted (next 3 days)
-    for (let m = 0; m < 3; m++) {
+    // Predicted (next 2 days)
+    for (let m = 0; m < 2; m++) {
       let dateStr = '';
       const row: any = { type: 'predicted' };
       
@@ -135,7 +130,7 @@ export const HistoricalChart: React.FC<HistoricalChartProps> = ({ stations }) =>
         <div>
           <h3 className="text-xl font-black text-slate-800 tracking-tight">Análise Histórica + Previsão (Holt)</h3>
           <p className="text-sm text-slate-500 font-medium">
-            Sazonalidade Térmica (30 dias observados + 3 projetados)
+            Sazonalidade Térmica (30 dias observados + 2 projetados)
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -300,7 +295,7 @@ export const HistoricalChart: React.FC<HistoricalChartProps> = ({ stations }) =>
         <TrendingUp className="w-4 h-4 text-violet-500 mt-0.5 shrink-0" />
         <p className="text-[11px] text-slate-400 leading-relaxed">
           <strong className="text-violet-600">Modelo Preditivo:</strong> Suavização Exponencial Dupla (Holt) com α=0.35 e β=0.15.
-          Projeções de 3 dias baseadas na tendência dos 30 dias anteriores. {selectedStationId !== 'all' ? 'No modo de estação específica, o modelo prediz a Temperatura Real e a Temperatura Aparente separadamente.' : 'No modo de rede completa, todas as estações são simuladas simultaneamente.'}
+          Projeções de 2 dias baseadas na tendência dos 30 dias anteriores. {selectedStationId !== 'all' ? 'No modo de estação específica, o modelo prediz a Temperatura Real e a Temperatura Aparente separadamente.' : 'No modo de rede completa, todas as estações são simuladas simultaneamente.'}
         </p>
       </div>
     </div>
