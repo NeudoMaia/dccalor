@@ -8,7 +8,8 @@ import {
   Map as MapIcon, 
   ShieldCheck, 
   Radio, 
-  BarChart3 
+  BarChart3,
+  Heart
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { TabType } from '../../types';
@@ -24,13 +25,14 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: 'protocols', label: 'Protocolos de Ação', icon: ShieldCheck, category: 'Dashboard' },
     { id: 'iot', label: 'Estações IoT', icon: Radio, category: 'Infraestrutura' },
     { id: 'analysis', label: 'Relatórios Históricos', icon: BarChart3, category: 'Infraestrutura' },
+    { id: 'dcpet', label: 'DCPET - Saúde Animal', icon: Heart, category: 'Sistemas Externos', url: 'https://dcpet-defesa-civil.vercel.app/' },
   ];
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0">
       <div className="flex-1 p-4 overflow-y-auto">
         <div className="space-y-6">
-          {['Dashboard', 'Infraestrutura'].map((cat) => (
+          {['Dashboard', 'Infraestrutura', 'Sistemas Externos'].map((cat) => (
             <div key={cat} className="space-y-1">
               <div className="text-[10px] font-bold text-slate-400 px-4 mb-2 uppercase tracking-widest leading-none">
                 {cat}
@@ -38,29 +40,54 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               <div className="space-y-1">
                 {items
                   .filter((i) => i.category === cat)
-                  .map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id as TabType)}
-                      className={cn(
-                        "w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative",
-                        activeTab === item.id 
-                          ? "bg-blue-50 text-blue-700 shadow-sm" 
-                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                        activeTab === item.id ? "bg-blue-700 scale-100" : "bg-slate-300 scale-75 group-hover:bg-slate-400"
-                      )} />
-                      <span className={cn(
-                        "text-sm tracking-tight",
-                        activeTab === item.id ? "font-bold uppercase" : "font-medium"
-                      )}>
-                        {item.label}
-                      </span>
-                    </button>
-                  ))}
+                  .map((item) => {
+                    const isExternal = !!item.url;
+                    const content = (
+                      <>
+                        <div className={cn(
+                          "w-1.5 h-1.5 rounded-full transition-all duration-300",
+                          activeTab === item.id ? "bg-blue-700 scale-100" : "bg-slate-300 scale-75 group-hover:bg-slate-400"
+                        )} />
+                        <span className={cn(
+                          "text-sm tracking-tight",
+                          activeTab === item.id ? "font-bold uppercase" : "font-medium"
+                        )}>
+                          {item.label}
+                        </span>
+                      </>
+                    );
+
+                    const commonClasses = cn(
+                      "w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative",
+                      activeTab === item.id 
+                        ? "bg-blue-50 text-blue-700 shadow-sm" 
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    );
+
+                    if (isExternal) {
+                      return (
+                        <a
+                          key={item.id}
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={commonClasses}
+                        >
+                          {content}
+                        </a>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id as TabType)}
+                        className={commonClasses}
+                      >
+                        {content}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           ))}

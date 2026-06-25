@@ -13,7 +13,7 @@ import { ProtocolView } from './components/dashboard/ProtocolView';
 import { IoTManager } from './components/iot/IoTManager';
 import { HistoricalChart } from './components/analysis/HistoricalChart';
 import { TechnicalManual } from './components/analysis/TechnicalManual';
-import { Login } from './components/auth/Login';
+
 import { useWeatherSimulation } from './hooks/useWeatherSimulation';
 import { TabType } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -195,23 +195,5 @@ function Dashboard() {
 }
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-
-  useEffect(() => {
-    const authStatus = sessionStorage.getItem('dccalor_auth');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
-
-  const handleLogin = () => {
-    sessionStorage.setItem('dccalor_auth', 'true');
-    setIsAuthenticated(true);
-  };
-
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   return <Dashboard />;
 }
