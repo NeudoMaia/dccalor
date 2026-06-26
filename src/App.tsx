@@ -8,6 +8,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { WeatherCard } from './components/dashboard/WeatherCard';
 import { HeatMap } from './components/dashboard/HeatMap';
+import { Login } from './components/auth/Login';
 import { RankingList } from './components/dashboard/RankingList';
 import { ProtocolView } from './components/dashboard/ProtocolView';
 import { IoTManager } from './components/iot/IoTManager';
@@ -195,5 +196,18 @@ function Dashboard() {
 }
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('isAuthenticated') === 'true';
+  });
+
+  const handleLogin = () => {
+    sessionStorage.setItem('isAuthenticated', 'true');
+    setIsAuthenticated(true);
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return <Dashboard />;
 }
