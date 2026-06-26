@@ -95,7 +95,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           
           {/* Logo da Defesa Civil de Fortaleza */}
           <div className="pt-4 mt-2 border-t border-slate-100 flex flex-col items-center justify-center gap-2 shrink-0">
-            <div className="w-20 h-20 flex items-center justify-center shrink-0">
+            <div className="w-24 h-24 flex items-center justify-center shrink-0">
               <DefesaCivilLogo className="w-full h-full drop-shadow-sm transform hover:scale-105 transition-all duration-300" />
             </div>
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center leading-tight">
