@@ -130,10 +130,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
             
             <h1 className="text-2xl font-black text-white tracking-tight uppercase">
-              SITermal
+              DCCALOR
             </h1>
             <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mt-1">
-              Painel de Monitoramento • Fortaleza
+              Painel de Monitoramento Climático • Fortaleza
             </p>
             <p className="text-sm text-slate-400 mt-3 font-medium max-w-xs">
               Logística, Planejamento e Arquitetura de Prevenção de Ilhas de Calor

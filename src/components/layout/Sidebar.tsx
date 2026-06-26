@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { TabType } from '../../types';
+import { DefesaCivilLogo } from '../auth/Login';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -91,6 +92,14 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               </div>
             </div>
           ))}
+          
+          {/* Logo da Defesa Civil de Fortaleza */}
+          <div className="pt-6 border-t border-slate-100 flex flex-col items-center justify-center gap-2">
+            <DefesaCivilLogo className="w-24 h-24 drop-shadow-sm transform hover:scale-105 transition-all duration-300" />
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center leading-tight">
+              Defesa Civil<br />Fortaleza
+            </span>
+          </div>
         </div>
       </div>
 

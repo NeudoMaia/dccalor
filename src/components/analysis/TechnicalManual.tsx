@@ -15,7 +15,7 @@ export const TechnicalManual: React.FC = () => {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Documentação Técnica Detalhada: SITermal v4.0</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Documentação Técnica Detalhada: DCCALOR v4.0</h2>
             <p className="text-slate-500 font-medium">Fundamentos, Modelagem e Inteligência Analítica</p>
           </div>
         </div>
@@ -143,11 +143,11 @@ export const TechnicalManual: React.FC = () => {
         </div>
       </div>
       
-      {/* Sobre o SITermal */}
+      {/* Sobre o DCCALOR */}
       <div className="bg-slate-900 rounded-xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-20 -top-20 w-80 h-80 bg-slate-800 rounded-full blur-3xl opacity-50" />
         <div className="relative z-10">
-          <h3 className="text-lg font-bold mb-2">Sobre o SITermal</h3>
+          <h3 className="text-lg font-bold mb-2">Sobre o DCCALOR</h3>
           <p className="text-slate-400 text-sm leading-relaxed">
             Sistema de monitoramento de ilhas de calor urbana desenvolvido como iniciativa da Defesa Civil de Fortaleza. Versão 4.1.0.
             Modelos: IDT (Thom), ICU (Estação de Referência), IDW (Interpolação Espacial), Holt (Previsão).

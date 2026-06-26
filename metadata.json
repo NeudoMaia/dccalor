@@ -1,5 +1,5 @@
 {
-  "name": "SITermal - Centro de Inteligência Térmica",
+  "name": "DCCALOR - Centro de Inteligência Térmica",
   "description": "Sistema de análise preditiva e monitoramento de ilhas de calor urbana em Fortaleza, integrado com a Defesa Civil e Secretaria de Saúde.",
   "requestFramePermissions": [
     "geolocation"

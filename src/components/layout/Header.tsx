@@ -22,10 +22,10 @@ export function Header({ title, isLive }: HeaderProps) {
   return (
     <header className="h-16 flex items-center justify-between px-8 bg-white border-b border-slate-200 shadow-sm shrink-0 z-10 w-full">
       <div className="flex items-center gap-4">
-        <div className="w-10 h-10 bg-blue-700 rounded flex items-center justify-center text-white font-bold shadow-lg shadow-blue-700/20">ST</div>
+        <div className="w-10 h-10 bg-blue-700 rounded flex items-center justify-center text-white font-bold shadow-lg shadow-blue-700/20">DC</div>
         <div>
           <h1 className="text-lg font-bold text-slate-800 leading-tight">
-            SITermal <span className="font-normal text-slate-400 mx-2">|</span> <span className="text-blue-600">{title}</span>
+            DCCALOR <span className="font-normal text-slate-400 mx-2">|</span> <span className="text-blue-600">{title}</span>
           </h1>
           <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
             Monitoramento de Ilhas de Calor Urbana (ICU) — IDT Thom + IDW + Holt
