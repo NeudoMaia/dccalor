@@ -48,6 +48,207 @@ const fallbackResponse: AIAnalysis = {
   ],
 };
 
+function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AIAnalysis {
+  const recommendations: any[] = [];
+  
+  let maxIdt = -Infinity;
+  let criticalStation: StationData | null = null;
+  
+  stations.forEach(s => {
+    if (s.idt > maxIdt) {
+      maxIdt = s.idt;
+      criticalStation = s;
+    }
+  });
+
+  const currentLevel = criticalStation ? (criticalStation as StationData).status : 'NIVEL_0';
+  const currentLevelName = 
+    currentLevel === 'NIVEL_3' ? 'Alarme' :
+    currentLevel === 'NIVEL_2' ? 'Alerta' :
+    currentLevel === 'NIVEL_1' ? 'Atenção' : 'Seguro';
+  
+  if (criticalStation) {
+    const sName = (criticalStation as StationData).name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '');
+    const idtVal = (criticalStation as StationData).idt;
+    if (currentLevel === 'NIVEL_1') {
+      recommendations.push({
+        id: "rec-cur-1",
+        type: "HEALTH",
+        title: `Hidratação Preventiva - ${sName}`,
+        description: `Sensação térmica de ${idtVal}°C (Nível de Atenção). Recomenda-se beber água constantemente e evitar exposição prolongada ao sol.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+      recommendations.push({
+        id: "rec-cur-2",
+        type: "CIVIL_DEFENSE",
+        title: `Informativos de Saúde - ${sName}`,
+        description: `Disparar alertas preventivos de autocuidado nos canais oficiais para o bairro ${sName} e adjacências.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+    } else if (currentLevel === 'NIVEL_2') {
+      recommendations.push({
+        id: "rec-cur-1",
+        type: "HEALTH",
+        title: `Risco de Insolação - ${sName}`,
+        description: `Sensação térmica crítica de ${idtVal}°C. Recomenda-se evitar atividades físicas externas e pausar trabalhos ao ar livre.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+      recommendations.push({
+        id: "rec-cur-2",
+        type: "CIVIL_DEFENSE",
+        title: `Pausas no Trabalho Externo - ${sName}`,
+        description: `Recomendar pausas obrigatórias no trabalho ao ar livre de operários/agentes entre 13h e 17h. Preparar rede de atendimento de saúde.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+      recommendations.push({
+        id: "rec-cur-3",
+        type: "TRAFFIC",
+        title: `Monitoramento de Vias - ${sName}`,
+        description: `Intensificar fiscalização de trânsito em pontos de congestionamento para reduzir tempo de exposição dos condutores ao calor.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+    } else if (currentLevel === 'NIVEL_3') {
+      recommendations.push({
+        id: "rec-cur-1",
+        type: "HEALTH",
+        title: `Emergência Médica: AVC Térmico - ${sName}`,
+        description: `Sensação extrema de ${idtVal}°C. Risco de choque térmico e AVC. Permaneça em ambientes resfriados e procure ajuda médica se necessário.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+      recommendations.push({
+        id: "rec-cur-2",
+        type: "CIVIL_DEFENSE",
+        title: `Pontos de Resfriamento - ${sName}`,
+        description: `Determinar abertura emergencial de abrigos públicos com ar-condicionado e distribuição de água. Suspensão total de obras externas nas vias.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+      recommendations.push({
+        id: "rec-cur-3",
+        type: "TRAFFIC",
+        title: `Suspensão de Obras de Asfalto - ${sName}`,
+        description: `Paralisar recapeamento asfáltico para evitar sobreaquecimento adicional da atmosfera urbana em áreas críticas.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+    } else {
+      recommendations.push({
+        id: "rec-cur-default",
+        type: "CIVIL_DEFENSE",
+        title: `Monitoramento Climatológico - ${sName}`,
+        description: `Temperatura e sensação térmica de ${idtVal}°C dentro da faixa de segurança em ${sName}. Seguir rotina padrão.`,
+        timeframe: "Imediato",
+        targetStation: sName
+      });
+    }
+  }
+
+  const risingStations: any[] = [];
+  if (forecasts && forecasts.length > 0) {
+    forecasts.forEach((f: any) => {
+      const sName = f.name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '');
+      const curStat = stations.find(s => s.id === f.id);
+      const curIdt = curStat ? curStat.idt : 28;
+      
+      if (f.idtForecast) {
+        f.idtForecast.forEach((day: any, idx: number) => {
+          const forecastedIdt = day.value;
+          const forecastedLevel = 
+            forecastedIdt <= 27 ? 'NIVEL_0' :
+            forecastedIdt <= 32 ? 'NIVEL_1' :
+            forecastedIdt <= 41.1 ? 'NIVEL_2' : 'NIVEL_3';
+          
+          if (forecastedIdt - curIdt >= 1.2 && forecastedLevel !== 'NIVEL_0') {
+            const dayNum = idx + 1;
+            const timeframeStr = `Próximas ${dayNum * 24}h`;
+            
+            if (!risingStations.some(r => r.name === sName && r.timeframe === timeframeStr)) {
+              risingStations.push({
+                name: sName,
+                currentIdt: curIdt,
+                predictedIdt: forecastedIdt,
+                timeframe: timeframeStr,
+                level: forecastedLevel
+              });
+            }
+          }
+        });
+      }
+    });
+  }
+
+  risingStations.slice(0, 3).forEach((r, idx) => {
+    let title = "";
+    let desc = "";
+    let type: 'HEALTH' | 'TRAFFIC' | 'CIVIL_DEFENSE' = "CIVIL_DEFENSE";
+
+    if (r.level === 'NIVEL_2' || r.level === 'NIVEL_3') {
+      type = "CIVIL_DEFENSE";
+      title = `Prevenção Climatológica (${r.timeframe}) - ${r.name}`;
+      desc = `Projeção matemática (Holt) aponta elevação crítica da sensação térmica para ${r.predictedIdt}°C. Recomenda-se pré-alertar hospitais e preparar planos de contingência locais.`;
+    } else {
+      type = "HEALTH";
+      title = `Alerta Preventivo (${r.timeframe}) - ${r.name}`;
+      desc = `Previsão de aumento de sensação térmica de ${r.currentIdt}°C para ${r.predictedIdt}°C. Recomendamos divulgar cuidados básicos com hidratação e insolação preventiva.`;
+    }
+
+    recommendations.push({
+      id: `rec-pred-${idx}`,
+      type,
+      title,
+      description: desc,
+      timeframe: r.timeframe,
+      targetStation: r.name
+    });
+  });
+
+  if (recommendations.filter(r => r.id.startsWith('rec-pred')).length === 0 && forecasts && forecasts.length > 0) {
+    const highestFuture = forecasts.map((f: any) => {
+      const maxVal = f.idtForecast && f.idtForecast.length > 0 
+        ? Math.max(...f.idtForecast.map((d: any) => d.value)) 
+        : 28;
+      return { name: f.name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', ''), maxVal };
+    }).sort((a, b) => b.maxVal - a.maxVal)[0];
+
+    if (highestFuture) {
+      recommendations.push({
+        id: "rec-pred-default",
+        type: "CIVIL_DEFENSE",
+        title: `Manutenção de Alerta - ${highestFuture.name}`,
+        description: `Tendência estável de sensação térmica em torno de ${highestFuture.maxVal.toFixed(1)}°C nos próximos 3 dias. Manter rotina de monitoramento.`,
+        timeframe: "Próximas 48h",
+        targetStation: highestFuture.name
+      });
+    }
+  }
+
+  let report = "";
+  if (criticalStation) {
+    const sName = (criticalStation as StationData).name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '');
+    report = `Análise Preditiva Dinâmica: Atualmente, a rede de monitoramento registra nível de ${currentLevelName} devido à sensação de ${(criticalStation as StationData).idt}°C no bairro ${sName}. `;
+    
+    if (risingStations.length > 0) {
+      const risingText = risingStations.map(r => `${r.name} (${r.predictedIdt}°C em ${r.timeframe})`).join(', ');
+      report += `Modelos matemáticos de Holt preveem aquecimento e maior estresse térmico para: ${risingText}. A Defesa Civil de Fortaleza recomenda ativação imediata de protocolos preventivos de hidratação e restrição de trabalho externo nessas áreas.`;
+    } else {
+      report += `As projeções de curto prazo para os próximos 3 dias indicam estabilização térmica e manutenção das condições normais na malha urbana de Fortaleza.`;
+    }
+  } else {
+    report = `Sistema operando em modo de segurança. Sensores sob monitoramento de rotina. Sem alterações térmicas esperadas para as próximas 72 horas.`;
+  }
+
+  return {
+    report,
+    recommendations: recommendations.slice(0, 5)
+  };
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -160,7 +361,8 @@ Analise os dados e gere um JSON contendo:
     const parsed = JSON.parse(response.text || '{}') as AIAnalysis;
     res.status(200).json(parsed);
   } catch (error) {
-    console.error('AI Analysis failed:', error);
-    res.status(500).json({ error: 'Falha no serviço de IA', ...fallbackResponse });
+    console.error('AI Analysis failed, serving dynamic fallback:', error);
+    const dynamicAnalysis = generateDynamicFallback(payload.stations, payload.forecasts);
+    res.status(200).json(dynamicAnalysis);
   }
 }
