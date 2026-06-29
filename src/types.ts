@@ -50,6 +50,8 @@ export interface AIAnalysis {
     type: 'HEALTH' | 'TRAFFIC' | 'CIVIL_DEFENSE';
     title: string;
     description: string;
+    timeframe?: string;
+    targetStation?: string;
   }[];
 }
 

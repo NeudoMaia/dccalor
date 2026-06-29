@@ -7,14 +7,14 @@ import { StationData, AIAnalysis } from "../types";
 
 const ANALYZE_ENDPOINT = '/api/analyze';
 
-export async function analyzeThermalData(stations: StationData[]): Promise<AIAnalysis> {
+export async function analyzeThermalData(stations: StationData[], forecasts: any[]): Promise<AIAnalysis> {
   try {
     const response = await fetch(ANALYZE_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ stations }),
+      body: JSON.stringify({ stations, forecasts }),
     });
 
     if (!response.ok) {

@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { StationData, AIAnalysis } from '../types';
 import { INITIAL_STATIONS, HISTORICAL_BASELINES } from '../constants';
 import { calculateIDT, calculateICU, getStatusFromIDT } from '../lib/utils';
-import { calculateAnomaly } from '../lib/prediction';
+import { calculateAnomaly, holtPredict } from '../lib/prediction';
+import { generateAnchoredHistory } from '../lib/history';
 import { analyzeThermalData } from '../services/geminiService';
 
 export function useWeatherSimulation() {
@@ -127,7 +128,20 @@ export function useWeatherSimulation() {
       if (stationsRef.current.length === 0) return;
       setLoadingAI(true);
       try {
-        const report = await analyzeThermalData(stationsRef.current);
+        const forecasts = stationsRef.current.map(station => {
+          const history = generateAnchoredHistory(station, 30);
+          const tempValues = history.map(h => h.temp);
+          const idtValues = history.map(h => h.idt);
+          
+          return {
+            id: station.id,
+            name: station.name,
+            tempForecast: holtPredict(tempValues, 3),
+            idtForecast: holtPredict(idtValues, 3)
+          };
+        });
+
+        const report = await analyzeThermalData(stationsRef.current, forecasts);
         setAiReport(report);
       } catch (error) {
         console.error("AI Analysis failed, skipping:", error);

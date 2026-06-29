@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { AIAnalysis } from '../../types';
-import { Brain, Bell, Ambulance, TrafficCone, ShieldAlert, Loader2, CheckCircle2, AlertTriangle, Siren } from 'lucide-react';
+import { Brain, Bell, Ambulance, TrafficCone, ShieldAlert, Loader2, CheckCircle2, AlertTriangle, Siren, Clock, MapPin } from 'lucide-react';
 import { cn, IDT_ALERT_TABLE, getAlertInfo } from '../../lib/utils';
 import { motion } from 'motion/react';
 
@@ -123,7 +123,7 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-xs font-bold text-slate-800 mb-6 uppercase tracking-widest border-b border-slate-100 pb-3">Protocolos e Medidas Preventivas</h3>
           
-          <div className="space-y-3">
+          <div className="space-y-4">
             {analysis?.recommendations?.length ? (
               analysis.recommendations.map((rec) => (
                 <motion.div 
@@ -131,14 +131,14 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   className={cn(
-                    "flex gap-4 p-4 rounded-lg border transition-all duration-300",
-                    rec.type === 'HEALTH' ? "bg-red-50/50 border-red-100" : 
-                    rec.type === 'TRAFFIC' ? "bg-amber-50/50 border-amber-100" : 
-                    "bg-blue-50/50 border-blue-100"
+                    "flex gap-4 p-4 rounded-xl border transition-all duration-300 hover:shadow-md",
+                    rec.type === 'HEALTH' ? "bg-red-50/30 border-red-100/70" : 
+                    rec.type === 'TRAFFIC' ? "bg-amber-50/30 border-amber-100/70" : 
+                    "bg-blue-50/30 border-blue-100/70"
                   )}
                 >
                   <div className={cn(
-                    "p-2.5 h-fit rounded bg-white border shadow-sm",
+                    "p-2.5 h-fit rounded-lg bg-white border shadow-sm",
                     rec.type === 'HEALTH' ? "text-red-500 border-red-100" : 
                     rec.type === 'TRAFFIC' ? "text-amber-600 border-amber-100" : 
                     "text-blue-600 border-blue-100"
@@ -147,16 +147,39 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading })
                      rec.type === 'TRAFFIC' ? <TrafficCone className="w-5 h-5" /> : 
                      <Bell className="w-5 h-5" />}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h4 className={cn(
-                      "font-bold text-sm tracking-tight mb-0.5",
+                      "font-bold text-sm tracking-tight mb-1",
                       rec.type === 'HEALTH' ? "text-red-900" : (rec.type === 'TRAFFIC' ? "text-amber-900" : "text-blue-900")
                     )}>
                       {rec.title}
                     </h4>
-                    <p className="text-slate-500 text-xs font-medium leading-relaxed">
+                    <p className="text-slate-600 text-xs font-medium leading-relaxed mb-2">
                       {rec.description}
                     </p>
+                    <div className="flex flex-wrap gap-2">
+                      {rec.timeframe && (
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider border shadow-sm",
+                          rec.timeframe.toLowerCase().includes('imediato') 
+                            ? "bg-red-100/80 text-red-700 border-red-200" 
+                            : rec.timeframe.toLowerCase().includes('24h')
+                            ? "bg-violet-100/80 text-violet-700 border-violet-200"
+                            : rec.timeframe.toLowerCase().includes('48h')
+                            ? "bg-orange-100/80 text-orange-700 border-orange-200"
+                            : "bg-blue-100/80 text-blue-700 border-blue-200"
+                        )}>
+                          <Clock className="w-3 h-3" />
+                          {rec.timeframe}
+                        </span>
+                      )}
+                      {rec.targetStation && (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-slate-100/80 text-slate-700 border border-slate-200 shadow-sm">
+                          <MapPin className="w-3 h-3 text-slate-500" />
+                          {rec.targetStation}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))
