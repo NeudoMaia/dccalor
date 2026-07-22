@@ -33,20 +33,6 @@ interface AIAnalysis {
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 
-const fallbackResponse: AIAnalysis = {
-  report: "Erro ao processar análise em tempo real. IDT e ICU sugerem atenção elevada em áreas centrais devido ao adensamento asfáltico. Referência: Messejana.",
-  recommendations: [
-    {
-      id: "rec-err",
-      type: "CIVIL_DEFENSE",
-      title: "Monitoramento Manual",
-      description: "Falha na análise automatizada. Recomenda-se verificação manual dos sensores no Centro e Montese. ICU acima de 1.5°C detectada.",
-      timeframe: "Imediato",
-      targetStation: "Centro"
-    },
-  ],
-};
-
 function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AIAnalysis {
   const recommendations: any[] = [];
   
@@ -249,24 +235,34 @@ function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AI
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
-  if (!GEMINI_KEY) {
-    res.status(500).json({
-      error: 'GEMINI_API_KEY não configurada no ambiente do servidor.',
-      ...fallbackResponse,
-    });
-    return;
+  let payload: { stations: StationData[], forecasts?: any[] } = { stations: [] };
+  try {
+    payload = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || { stations: [] });
+  } catch (error) {
+    console.warn("Corpo inválido em /api/analyze, usando fallback em branco:", error);
   }
 
-  let payload: { stations: StationData[], forecasts?: any[] };
-  try {
-    payload = req.body;
-  } catch (error) {
-    res.status(400).json({ error: 'Corpo inválido', ...fallbackResponse });
+  const stations = payload.stations || [];
+  const forecasts = payload.forecasts || [];
+
+  if (!GEMINI_KEY) {
+    console.log("GEMINI_API_KEY não configurada no ambiente. Fornecendo análise dinâmica local.");
+    const dynamicAnalysis = generateDynamicFallback(stations, forecasts);
+    res.status(200).json(dynamicAnalysis);
     return;
   }
 
