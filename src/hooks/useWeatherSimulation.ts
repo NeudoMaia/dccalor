@@ -19,9 +19,12 @@ export function useWeatherSimulation() {
   const [isLive, setIsLive] = useState(false); // Indica se estamos consumindo dados reais da Plugfield
   const [loadingLive, setLoadingLive] = useState(false);
 
-  // Computar a lista final mesclada (Estações da Defesa Civil + Sensores IoT criados pelo usuário)
+  // Computar a lista final mesclada e ordenada do mais quente para o mais frio (maior temperatura real)
   const stations = useMemo(() => {
-    return [...apiStations, ...customSensors];
+    return [...apiStations, ...customSensors].sort((a, b) => {
+      if (b.temp !== a.temp) return b.temp - a.temp;
+      return b.idt - a.idt;
+    });
   }, [apiStations, customSensors]);
 
   const stationsRef = useRef<StationData[]>(stations);
@@ -122,38 +125,38 @@ export function useWeatherSimulation() {
     return () => clearInterval(interval);
   }, [isLive, updateLocalSimulation]);
 
-  // E. Análise de IA periódica via Gemini a cada 5 minutos
-  useEffect(() => {
-    const fetchAI = async () => {
-      if (stationsRef.current.length === 0) return;
-      setLoadingAI(true);
-      try {
-        const forecasts = stationsRef.current.map(station => {
-          const history = generateAnchoredHistory(station, 30);
-          const tempValues = history.map(h => h.temp);
-          const idtValues = history.map(h => h.idt);
-          
-          return {
-            id: station.id,
-            name: station.name,
-            tempForecast: holtPredict(tempValues, 3),
-            idtForecast: holtPredict(idtValues, 3)
-          };
-        });
+  // E. Análise de IA periódica via Gemini ou acionada manualmente pelo usuário
+  const runAIAnalysis = useCallback(async () => {
+    if (stationsRef.current.length === 0) return;
+    setLoadingAI(true);
+    try {
+      const forecasts = stationsRef.current.map(station => {
+        const history = generateAnchoredHistory(station, 30);
+        const tempValues = history.map(h => h.temp);
+        const idtValues = history.map(h => h.idt);
+        
+        return {
+          id: station.id,
+          name: station.name,
+          tempForecast: holtPredict(tempValues, 3),
+          idtForecast: holtPredict(idtValues, 3)
+        };
+      });
 
-        const report = await analyzeThermalData(stationsRef.current, forecasts);
-        setAiReport(report);
-      } catch (error) {
-        console.error("AI Analysis failed, skipping:", error);
-      } finally {
-        setLoadingAI(false);
-      }
-    };
-
-    const interval = setInterval(fetchAI, 300000);
-    fetchAI(); // Chamada inicial imediata
-    return () => clearInterval(interval);
+      const report = await analyzeThermalData(stationsRef.current, forecasts);
+      setAiReport(report);
+    } catch (error) {
+      console.error("AI Analysis failed, skipping:", error);
+    } finally {
+      setLoadingAI(false);
+    }
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(runAIAnalysis, 300000);
+    runAIAnalysis(); // Chamada inicial imediata
+    return () => clearInterval(interval);
+  }, [runAIAnalysis]);
 
   // F. Adicionar sensores customizados da rede IoT
   const addSensor = (sensor: Omit<StationData, 'id' | 'icu' | 'status' | 'idt' | 'avgAnomaly' | 'isReference' | 'windSpeed' | 'solarRadiation'>) => {
@@ -181,6 +184,7 @@ export function useWeatherSimulation() {
     stations, 
     aiReport, 
     loadingAI, 
+    runAIAnalysis,
     addSensor, 
     isLive, 
     loadingLive, 

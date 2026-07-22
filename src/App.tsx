@@ -22,19 +22,18 @@ import { generateAnchoredHistory } from './lib/history';
 
 function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
-  const { stations, aiReport, loadingAI, addSensor, isLive } = useWeatherSimulation();
+  const { stations, aiReport, loadingAI, runAIAnalysis, addSensor, isLive } = useWeatherSimulation();
 
-  // Calcular ponto mais quente, mais frio e a amplitude térmica da rede (tempo real)
-  const sortedByIDT = useMemo(() => {
-    // Filtrar IoT ou qualquer estação válida e ordenar por Sensação Térmica
+  // Calcular ponto mais quente (maior temperatura real), mais frio e a amplitude térmica da rede (tempo real)
+  const sortedByTemp = useMemo(() => {
     return [...stations].sort((a, b) => {
-      if (b.idt !== a.idt) return b.idt - a.idt;
-      return b.temp - a.temp;
+      if (b.temp !== a.temp) return b.temp - a.temp;
+      return b.idt - a.idt;
     });
   }, [stations]);
 
-  const hottestStation = sortedByIDT[0];
-  const coolestStation = sortedByIDT[sortedByIDT.length - 1];
+  const hottestStation = sortedByTemp[0];
+  const coolestStation = sortedByTemp[sortedByTemp.length - 1];
   
   const tempDiff = useMemo(() => {
     if (!hottestStation || !coolestStation) return 0;
@@ -94,7 +93,7 @@ function Dashboard() {
               >
                 {/* Metric Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {sortedByIDT.slice(0, 3).map(station => (
+                  {sortedByTemp.slice(0, 3).map(station => (
                     <WeatherCard key={station.id} station={station} />
                   ))}
                   <div className="bg-white border-2 border-orange-600 p-5 rounded-xl shadow-md flex flex-col justify-between group hover:bg-orange-50 transition-colors">
@@ -146,7 +145,7 @@ function Dashboard() {
                 exit={{ opacity: 0, y: -10 }}
                 className="pb-10"
               >
-                <ProtocolView analysis={aiReport} loading={loadingAI} />
+                <ProtocolView analysis={aiReport} loading={loadingAI} onRunAnalysis={runAIAnalysis} stations={stations} />
               </motion.div>
             )}
 

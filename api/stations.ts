@@ -244,10 +244,10 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Ordenação dinâmica: maiores sensações térmicas (IDT) primeiro, seguido por temperatura real
+    // Ordenação dinâmica: maior temperatura real primeiro, seguida por sensação térmica (IDT)
     processedStations.sort((a, b) => {
-      if (b.idt !== a.idt) return b.idt - a.idt;
-      return b.temp - a.temp;
+      if (b.temp !== a.temp) return b.temp - a.temp;
+      return b.idt - a.idt;
     });
 
     res.status(200).json({
@@ -318,8 +318,8 @@ export default async function handler(req: any, res: any) {
 
     // Ordenação dinâmica para o fallback
     finalSimulated.sort((a, b) => {
-      if (b.idt !== a.idt) return b.idt - a.idt;
-      return b.temp - a.temp;
+      if (b.temp !== a.temp) return b.temp - a.temp;
+      return b.idt - a.idt;
     });
 
     res.status(200).json({

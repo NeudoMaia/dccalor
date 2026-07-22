@@ -13,7 +13,10 @@ interface RankingListProps {
 }
 
 export const RankingList: React.FC<RankingListProps> = ({ stations }) => {
-  const sorted = [...stations].sort((a, b) => b.temp - a.temp);
+  const sorted = [...stations].sort((a, b) => {
+    if (b.temp !== a.temp) return b.temp - a.temp;
+    return b.idt - a.idt;
+  });
   const referenceStation = stations.find(s => s.isReference);
 
   return (

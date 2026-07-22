@@ -31,8 +31,7 @@ interface AIAnalysis {
   }[];
 }
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY || "AIzaSyD1WOd4p4bzEobzWb4iIVhLJ79qnGOOHc8";
-const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
+const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 
 const fallbackResponse: AIAnalysis = {
   report: "Erro ao processar análise em tempo real. IDT e ICU sugerem atenção elevada em áreas centrais devido ao adensamento asfáltico. Referência: Messejana.",
@@ -51,12 +50,12 @@ const fallbackResponse: AIAnalysis = {
 function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AIAnalysis {
   const recommendations: any[] = [];
   
-  let maxIdt = -Infinity;
+  let maxTemp = -Infinity;
   let criticalStation: StationData | null = null;
   
   stations.forEach(s => {
-    if (s.idt > maxIdt) {
-      maxIdt = s.idt;
+    if (s.temp > maxTemp) {
+      maxTemp = s.temp;
       criticalStation = s;
     }
   });
@@ -314,6 +313,7 @@ Diretrizes de Análise Preditiva:
 2. Identifique tendências de aumento significativo de temperatura/IDT (ilha de calor).
 3. Se alguma estação estiver prevista para subir de nível (ex: Nível 1 para Nível 2) nos próximos dias, crie recomendações de protocolo preventivo adequadas.
 4. Para cada recomendação, associe o "timeframe" correspondente (ex: "Imediato", "Próximas 24h", "Próximas 48h" ou "Próximas 72h") e a estação/bairro alvo ("targetStation").
+5. A estação que apresenta a MAIOR TEMPERATURA REAL no momento deve SEMPRE ser destacada como a principal estação em análise e ponto de atenção prioritário.
 
 Instruções de Saída:
 Analise os dados e gere um JSON contendo:
@@ -328,6 +328,7 @@ Analise os dados e gere um JSON contendo:
   `;
 
   try {
+    const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
