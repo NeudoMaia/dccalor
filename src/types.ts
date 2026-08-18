@@ -43,6 +43,15 @@ export interface IDTAlertInfo {
   color: string;
 }
 
+export interface HealthPathologiesReport {
+  alertLevel: 'Baixo' | 'Moderado' | 'Alto' | 'Extremo';
+  immediateImpacts: string;
+  chronicAggravation: string;
+  vectorialRisk: string;
+  vulnerableGroups: string;
+  protectionRecommendations: string[];
+}
+
 export interface AIAnalysis {
   report: string;
   recommendations: {
@@ -53,6 +62,7 @@ export interface AIAnalysis {
     timeframe?: string;
     targetStation?: string;
   }[];
+  healthReport?: HealthPathologiesReport;
 }
 
 export interface GridPoint {

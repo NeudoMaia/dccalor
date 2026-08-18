@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { StationData, AIAnalysis } from "../types";
+import { StationData, AIAnalysis, HealthPathologiesReport } from "../types";
 
 const ANALYZE_ENDPOINT = '/api/analyze';
 
 export function generateClientDynamicAnalysis(stations: StationData[], forecasts?: any[]): AIAnalysis {
   if (!stations || stations.length === 0) {
     return {
-      report: "Rede de monitoramento operando em rotina. Sensores sob acompanhamento continuo.",
+      report: "Rede de monitoramento operando em rotina. Sensores sob acompanhamento contínuo.",
       recommendations: [
         {
           id: "rec-def-1",
@@ -128,11 +128,73 @@ export function generateClientDynamicAnalysis(stations: StationData[], forecasts
     }
   }
 
-  const report = `Análise Preditiva em Tempo Real: O bairro de ${sName} apresenta atualmente a maior temperatura da malha urbana (${hottest.temp}°C, sensação térmica de ${hottest.idt.toFixed(1)}°C - Nível ${currentLevelName}). A Defesa Civil de Fortaleza recomenda monitoramento contínuo dos protocolos preventivos.`;
+  // Análise epidemiológica dinâmica de fallback
+  const maxIdt = hottest.idt;
+  const maxTemp = hottest.temp;
+
+  let healthAlertLevel: HealthPathologiesReport['alertLevel'] = 'Baixo';
+  let immediateImpacts = "";
+  let chronicAggravation = "";
+  let vectorialRisk = "";
+  let vulnerableGroups = "Idosos, crianças (menores de 5 anos), gestantes, pessoas com comorbidades (cardiopatas e pneumopatas), trabalhadores ao ar livre e populações em situação de rua.";
+  let protectionRecommendations: string[] = [];
+
+  if (maxIdt >= 40 || maxTemp >= 38) {
+    healthAlertLevel = 'Extremo';
+    immediateImpacts = `Com a sensação térmica atingindo ${maxIdt.toFixed(1)}°C em ${sName}, o corpo humano perde a capacidade de termorregulação eficiente. Há risco altíssimo e imediato de Desidratação severa, Estresse térmico, Exaustão pelo calor e quadros agudos de Insolação, que podem ser fatais se não tratados rapidamente.`;
+    chronicAggravation = `O esforço do corpo para se resfriar causa forte vasodilatação, exigindo muito do sistema circulatório. Há risco iminente de descompensação, levando a Infarto agudo do miocárdio, Insuficiência cardíaca e episódios de Acidente Vascular Cerebral (AVC). O ar quente e úmido também pode desencadear crises de Asma e piora na DPOC.`;
+    vectorialRisk = `O calor extremo (${maxTemp.toFixed(1)}°C) somado à alta umidade cria o cenário perfeito para a eclosão acelerada de ovos de mosquitos. Alerta vermelho para o aumento exponencial de transmissores de Dengue, Zika e Chikungunya, além de atenção para Febre do Oropouche e Malária.`;
+    protectionRecommendations = [
+      `Suspender imediatamente atividades físicas e laborais pesadas ao ar livre entre 10h e 16h em ${sName}.`,
+      `Hidratação forçada constante, mesmo sem sensação de sede, especialmente para idosos e crianças.`,
+      `Reforçar plantões em UPAs e emergências cardiológicas para possível aumento de infartos e AVCs.`,
+      `Intensificar fumacê e eliminação de criadouros de Aedes aegypti, cujo ciclo reprodutivo é encurtado pelo calor.`,
+      `Manter pontos de resfriamento e distribuição de água potável em áreas de grande circulação.`
+    ];
+  } else if (maxIdt >= 32.1 || maxTemp >= 32) {
+    healthAlertLevel = 'Alto';
+    immediateImpacts = `Sensação térmica elevada de ${maxIdt.toFixed(1)}°C em ${sName}. Risco elevado de Estresse térmico, Exaustão pelo calor e Desidratação progressiva em tarefas externas.`;
+    chronicAggravation = `A forte vasodilatação compensatória eleva o débito cardíaco, aumentando o risco de descompensação em hipertensos e cardiopatas (Infarto, AVC, Insuficiência cardíaca). Pacientes com Asma e DPOC devem evitar exposição solar no meio do dia.`;
+    vectorialRisk = `Temperaturas elevadas encurtam o ciclo larvário de vetores urbanos (Dengue, Zika, Chikungunya, Leishmaniose) em áreas com retenção de água.`;
+    protectionRecommendations = [
+      `Orientar hidratação constante e uso de proteção solar.`,
+      `Pausar trabalhos pesados ao ar livre durante as horas mais quentes.`,
+      `Garantir monitoramento preventivo de idosos e crianças pequenas nas comunidades.`,
+      `Reforçar vistorias comunitárias para eliminação de focos do Aedes aegypti.`
+    ];
+  } else if (maxIdt >= 27.1) {
+    healthAlertLevel = 'Moderado';
+    immediateImpacts = `Sensação térmica de ${maxIdt.toFixed(1)}°C. Risco moderado de fadiga e desidratação sob esforço prolongado ao sol.`;
+    chronicAggravation = `Atenção rotineira para cardiopatas e portadores de Asma/DPOC.`;
+    vectorialRisk = `Vigilância epidemiológica padrão para controle de arboviroses urbanas.`;
+    protectionRecommendations = [
+      `Manter ingestão regular de líquidos.`,
+      `Evitar exposição prolongada ao sol nas horas mais quentes.`,
+      `Eliminar eventuais focos de água parada nas residências.`
+    ];
+  } else {
+    healthAlertLevel = 'Baixo';
+    immediateImpacts = `Condições térmicas confortáveis dentro dos limites normais de operação.`;
+    chronicAggravation = `Estabilidade clínica esperada para portadores de patologias crônicas.`;
+    vectorialRisk = `Nível de risco vetorial em patamar normal de rotina.`;
+    protectionRecommendations = [
+      `Manter rotina preventiva de saúde pública.`
+    ];
+  }
+
+  const report = `Análise Preditiva em Tempo Real: O bairro de ${sName} apresenta atualmente a maior temperatura da malha urbana (${hottest.temp}°C, sensação térmica de ${hottest.idt.toFixed(1)}°C - Nível ${currentLevelName}). Alerta epidemiológico de saúde classificado como ${healthAlertLevel.toUpperCase()}. A Defesa Civil de Fortaleza recomenda monitoramento contínuo dos protocolos preventivos.`;
 
   return {
     report,
-    recommendations: recommendations.slice(0, 5)
+    recommendations: recommendations.slice(0, 5),
+    healthReport: {
+      alertLevel: healthAlertLevel,
+      immediateImpacts,
+      chronicAggravation,
+      vectorialRisk,
+      vulnerableGroups,
+      protectionRecommendations
+    }
   };
 }
 

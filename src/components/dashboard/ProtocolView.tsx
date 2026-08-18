@@ -5,9 +5,14 @@
 
 import React, { useMemo } from 'react';
 import { AIAnalysis, StationData } from '../../types';
-import { Brain, Bell, Ambulance, TrafficCone, ShieldAlert, Loader2, CheckCircle2, AlertTriangle, Siren, Clock, MapPin, Sparkles, RefreshCw, Flame, Play } from 'lucide-react';
+import { 
+  Brain, Bell, Ambulance, TrafficCone, ShieldAlert, Loader2, CheckCircle2, 
+  AlertTriangle, Siren, Clock, MapPin, Sparkles, RefreshCw, Flame, Play,
+  Activity, HeartPulse, Bug, Users, ShieldCheck, ThermometerSun, Stethoscope, AlertCircle
+} from 'lucide-react';
 import { cn, IDT_ALERT_TABLE } from '../../lib/utils';
 import { motion } from 'motion/react';
+import { TechnicalManual } from '../analysis/TechnicalManual';
 
 interface ProtocolViewProps {
   analysis: AIAnalysis | null;
@@ -45,7 +50,7 @@ const alertIconBg: Record<string, string> = {
 };
 
 export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, onRunAnalysis, stations = [] }) => {
-  // Ordenar estações das mais quentes (maior Temperatura Real e Sensação Térmica) para destacar no painel em tempo real
+  // Ordenar estações das mais quentes (maior Temperatura Real e Sensação Térmica)
   const hottestStations = useMemo(() => {
     if (!stations.length) return [];
     return [...stations].sort((a, b) => {
@@ -53,6 +58,23 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
       return b.idt - a.idt;
     }).slice(0, 4);
   }, [stations]);
+
+  const healthReport = analysis?.healthReport;
+
+  // Estilização do badge de nível de alerta epidemiológico
+  const healthAlertBadgeStyle = useMemo(() => {
+    const level = healthReport?.alertLevel || 'Baixo';
+    switch (level) {
+      case 'Extremo':
+        return 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/30 animate-pulse';
+      case 'Alto':
+        return 'bg-orange-500 text-white border-orange-400 shadow-md';
+      case 'Moderado':
+        return 'bg-amber-500 text-white border-amber-400';
+      default:
+        return 'bg-emerald-600 text-white border-emerald-500';
+    }
+  }, [healthReport?.alertLevel]);
 
   return (
     <div className="space-y-8">
@@ -67,10 +89,10 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
               <span>Geração Preditiva de Protocolos em Tempo Real</span>
             </div>
             <h2 className="text-xl lg:text-2xl font-extrabold tracking-tight text-white">
-              Análise e Produção de Protocolos Climáticos
+              Análise e Produção de Protocolos Climáticos e Epidemiológicos
             </h2>
             <p className="text-slate-300 text-xs lg:text-sm leading-relaxed font-medium">
-              Acione o motor analítico para processar os dados das estações meteorológicas automáticas em tempo real. O sistema identifica os bairros mais quentes com faixas de Atenção, Alerta e Alarme e emite protocolos de ação imediata para a Defesa Civil.
+              Acione o motor analítico da IA para processar os dados das estações meteorológicas automáticas em tempo real. O sistema identifica os bairros mais quentes e avalia patologias sensíveis ao clima (cardiovasculares, respiratórias, vetoriais e ligadas ao calor).
             </p>
           </div>
 
@@ -101,7 +123,7 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Hottest Neighborhoods + AI Analysis + Protocols */}
+        {/* Left Column: Hottest Neighborhoods + AI Executive Summary + Health Impact Report + Action Protocols */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Bairros Mais Quentes em Tempo Real */}
@@ -168,12 +190,12 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
 
                       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 mt-1">
                         <div>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Sensação (IDT)</span>
-                          <span className="text-sm font-mono font-extrabold text-red-600">{st.idt}°C</span>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Temp Real</span>
+                          <span className="text-sm font-mono font-extrabold text-red-600">{st.temp}°C</span>
                         </div>
                         <div>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Temp Real</span>
-                          <span className="text-sm font-mono font-bold text-slate-800">{st.temp}°C</span>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Sensação (IDT)</span>
+                          <span className="text-sm font-mono font-bold text-slate-800">{st.idt}°C</span>
                         </div>
                         <div>
                           <span className="text-[9px] text-slate-400 font-bold uppercase block">Ilha Calor</span>
@@ -187,7 +209,7 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
             </div>
           )}
 
-          {/* AI Analysis Card */}
+          {/* AI Analysis Executive Summary Card */}
           <div className="bg-blue-900 rounded-xl p-8 text-white shadow-xl relative overflow-hidden group">
             <div className="absolute -right-20 -top-20 w-80 h-80 bg-blue-800 rounded-full blur-3xl opacity-50" />
             
@@ -214,11 +236,11 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
               )}
             </div>
 
-            <div className="relative min-h-[140px] bg-black/10 rounded-xl p-6 border border-white/5 backdrop-blur-sm z-10">
+            <div className="relative min-h-[120px] bg-black/10 rounded-xl p-6 border border-white/5 backdrop-blur-sm z-10">
               {loading && !analysis ? (
-                <div className="flex flex-col items-center justify-center h-32 text-blue-300/70 gap-3">
+                <div className="flex flex-col items-center justify-center h-28 text-blue-300/70 gap-3">
                   <Loader2 className="w-6 h-6 animate-spin text-yellow-400" />
-                  <span className="font-bold text-[10px] uppercase tracking-widest italic text-blue-200">Analisando sensores automáticos em tempo real...</span>
+                  <span className="font-bold text-[10px] uppercase tracking-widest italic text-blue-200">Analisando sensores automáticos e patologias...</span>
                 </div>
               ) : analysis?.report ? (
                 <motion.p 
@@ -229,11 +251,180 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
                   {analysis.report}
                 </motion.p>
               ) : (
-                <div className="flex flex-col items-center justify-center h-32 text-blue-200/70 gap-3">
+                <div className="flex flex-col items-center justify-center h-28 text-blue-200/70 gap-3">
                   <span className="font-bold text-[10px] uppercase tracking-widest italic">Nenhum resultado disponível no momento. Clique em "Análise e Possíveis Protocolos".</span>
                 </div>
               )}
             </div>
+          </div>
+
+          {/* NOVO SEÇÃO: BOLETIM EPIDEMIOLÓGICO DE IMPACTOS À SAÚDE E PATOLOGIAS CLIMA-SENSÍVEIS */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-50 text-red-600 border border-red-100">
+                  <Stethoscope className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                    Boletim de Impactos à Saúde & Patologias Clima-Sensíveis
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Análise em tempo real de doenças sensíveis ao clima e estresse térmico
+                  </p>
+                </div>
+              </div>
+
+              {healthReport && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nível de Alerta:</span>
+                  <span className={cn("px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border", healthAlertBadgeStyle)}>
+                    🚨 {healthReport.alertLevel}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {loading && !healthReport ? (
+              <div className="p-8 text-center text-slate-400 space-y-3">
+                <Loader2 className="w-7 h-7 animate-spin mx-auto text-blue-600" />
+                <p className="text-xs font-medium italic">Processando patologias e riscos climáticos em tempo real...</p>
+              </div>
+            ) : healthReport ? (
+              <div className="space-y-6">
+                
+                {/* 1. Impactos Imediatos (Relacionadas ao calor) */}
+                <div className="p-4 rounded-xl bg-orange-50/50 border border-orange-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ThermometerSun className="w-4 h-4 text-orange-600" />
+                      <h4 className="text-xs font-extrabold text-orange-950 uppercase tracking-wider">
+                        1. Impactos Imediatos (Doenças Relacionadas ao Calor)
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Insolação', 'Exaustão pelo calor', 'Desidratação', 'Estresse térmico'].map((disease) => (
+                      <span key={disease} className="px-2 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200 uppercase">
+                        {disease}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                    {healthReport.immediateImpacts}
+                  </p>
+                </div>
+
+                {/* 2. Agravamento de Doenças Crônicas (Cardiovasculares e Respiratórias) */}
+                <div className="p-4 rounded-xl bg-red-50/50 border border-red-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <HeartPulse className="w-4 h-4 text-red-600" />
+                      <h4 className="text-xs font-extrabold text-red-950 uppercase tracking-wider">
+                        2. Agravamento de Doenças Crônicas (Cardiovasculares & Respiratórias)
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'Infarto agudo do miocárdio', 'AVC', 'Insuficiência cardíaca', 
+                      'Asma', 'DPOC', 'Pneumonia', 'Infecções agudas', 'Influenza'
+                    ].map((disease) => (
+                      <span key={disease} className="px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-800 border border-red-200 uppercase">
+                        {disease}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                    {healthReport.chronicAggravation}
+                  </p>
+                </div>
+
+                {/* 3. Risco Epidemiológico / Vetorial */}
+                <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="w-4 h-4 text-emerald-600" />
+                      <h4 className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider">
+                        3. Risco Epidemiológico / Vetorial (Transmissores Clima-Sensíveis)
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'Dengue', 'Zika', 'Chikungunya', 'Malária', 'Febre amarela', 
+                      'Febre do Oropouche', 'Leishmaniose', 'Doença de Chagas', 'Filariose', 'Esquistossomose', 'Febre maculosa'
+                    ].map((disease) => (
+                      <span key={disease} className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
+                        {disease}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                    {healthReport.vectorialRisk}
+                  </p>
+                </div>
+
+                {/* 4. Grupos Vulneráveis Prioritários */}
+                <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider">
+                      4. Grupos Vulneráveis Prioritários
+                    </h4>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'Idosos', 'Crianças (< 5 anos)', 'Gestantes', 'Cardiopatas e Pneumopatas', 
+                      'Trabalhadores ao ar livre', 'População em situação de rua'
+                    ].map((grp) => (
+                      <span key={grp} className="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase">
+                        {grp}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                    {healthReport.vulnerableGroups}
+                  </p>
+                </div>
+
+                {/* 5. Recomendações de Proteção em Saúde */}
+                {healthReport.protectionRecommendations?.length > 0 && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                        5. Recomendações de Proteção em Saúde Pública
+                      </h4>
+                    </div>
+
+                    <ul className="space-y-2">
+                      {healthReport.protectionRecommendations.map((rec, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-xs text-slate-700 font-medium leading-relaxed">
+                          <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="p-6 text-center text-slate-400 text-xs italic">
+                Aguardando execução da análise para gerar o boletim de patologias clima-sensíveis.
+              </div>
+            )}
           </div>
 
           {/* Protocols and Recommendations */}
@@ -355,28 +546,12 @@ export const ProtocolView: React.FC<ProtocolViewProps> = ({ analysis, loading, o
             </div>
           </div>
 
-          {/* Methodology Section */}
-          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Metodologia de Cálculo</h4>
-            <div className="space-y-5">
-              <div className="flex gap-3">
-                <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">01</div>
-                <div>
-                  <p className="text-xs font-bold text-slate-800 uppercase tracking-tighter leading-none mb-1">Estação de Referência (ICU)</p>
-                  <p className="text-[10px] text-slate-400 leading-relaxed font-medium">ICU calculada comparando cada estação urbana com o ponto de controle térmico dinâmico da cidade (estação mais fria), conforme ICU = T_urbana − T_referência.</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">02</div>
-                <div>
-                  <p className="text-xs font-bold text-slate-800 uppercase tracking-tighter leading-none mb-1">IDT — Fórmula de Thom</p>
-                  <p className="text-[10px] text-slate-400 leading-relaxed font-medium">Índice de Desconforto Térmico via fórmula IDT = T − (0.55 − 0.0055×UR) × (T − 14.5), classificado em 4 níveis de alerta.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
         </div>
+      </div>
+
+      {/* Relatório Técnico Detalhado e Metodologia da IA (Retrátil) */}
+      <div className="pt-2">
+        <TechnicalManual defaultExpanded={false} />
       </div>
     </div>
   );

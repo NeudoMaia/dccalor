@@ -19,6 +19,15 @@ interface StationData {
   isReference?: boolean;
 }
 
+export interface HealthPathologiesReport {
+  alertLevel: 'Baixo' | 'Moderado' | 'Alto' | 'Extremo';
+  immediateImpacts: string;
+  chronicAggravation: string;
+  vectorialRisk: string;
+  vulnerableGroups: string;
+  protectionRecommendations: string[];
+}
+
 interface AIAnalysis {
   report: string;
   recommendations: {
@@ -29,6 +38,7 @@ interface AIAnalysis {
     timeframe?: string;
     targetStation?: string;
   }[];
+  healthReport?: HealthPathologiesReport;
 }
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
@@ -37,11 +47,15 @@ function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AI
   const recommendations: any[] = [];
   
   let maxTemp = -Infinity;
+  let maxIdt = -Infinity;
   let criticalStation: StationData | null = null;
   
   stations.forEach(s => {
     if (s.temp > maxTemp) {
       maxTemp = s.temp;
+    }
+    if (s.idt > maxIdt) {
+      maxIdt = s.idt;
       criticalStation = s;
     }
   });
@@ -52,9 +66,10 @@ function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AI
     currentLevel === 'NIVEL_2' ? 'Alerta' :
     currentLevel === 'NIVEL_1' ? 'Atenção' : 'Seguro';
   
+  const sName = criticalStation ? (criticalStation as StationData).name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '') : 'Fortaleza';
+  const idtVal = criticalStation ? (criticalStation as StationData).idt : 28;
+
   if (criticalStation) {
-    const sName = (criticalStation as StationData).name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '');
-    const idtVal = (criticalStation as StationData).idt;
     if (currentLevel === 'NIVEL_1') {
       recommendations.push({
         id: "rec-cur-1",
@@ -101,8 +116,8 @@ function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AI
       recommendations.push({
         id: "rec-cur-1",
         type: "HEALTH",
-        title: `Emergência Médica: AVC Térmico - ${sName}`,
-        description: `Sensação extrema de ${idtVal}°C. Risco de choque térmico e AVC. Permaneça em ambientes resfriados e procure ajuda médica se necessário.`,
+        title: `Emergência Médica: Choque Térmico - ${sName}`,
+        description: `Sensação extrema de ${idtVal}°C. Risco de choque térmico, AVC e infarto. Permaneça em ambientes resfriados e procure ajuda médica se necessário.`,
         timeframe: "Imediato",
         targetStation: sName
       });
@@ -111,14 +126,6 @@ function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AI
         type: "CIVIL_DEFENSE",
         title: `Pontos de Resfriamento - ${sName}`,
         description: `Determinar abertura emergencial de abrigos públicos com ar-condicionado e distribuição de água. Suspensão total de obras externas nas vias.`,
-        timeframe: "Imediato",
-        targetStation: sName
-      });
-      recommendations.push({
-        id: "rec-cur-3",
-        type: "TRAFFIC",
-        title: `Suspensão de Obras de Asfalto - ${sName}`,
-        description: `Paralisar recapeamento asfáltico para evitar sobreaquecimento adicional da atmosfera urbana em áreas críticas.`,
         timeframe: "Imediato",
         targetStation: sName
       });
@@ -134,103 +141,70 @@ function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AI
     }
   }
 
-  const risingStations: any[] = [];
-  if (forecasts && forecasts.length > 0) {
-    forecasts.forEach((f: any) => {
-      const sName = f.name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '');
-      const curStat = stations.find(s => s.id === f.id);
-      const curIdt = curStat ? curStat.idt : 28;
-      
-      if (f.idtForecast) {
-        f.idtForecast.forEach((day: any, idx: number) => {
-          const forecastedIdt = day.value;
-          const forecastedLevel = 
-            forecastedIdt <= 27 ? 'NIVEL_0' :
-            forecastedIdt <= 32 ? 'NIVEL_1' :
-            forecastedIdt <= 41.1 ? 'NIVEL_2' : 'NIVEL_3';
-          
-          if (forecastedIdt - curIdt >= 1.2 && forecastedLevel !== 'NIVEL_0') {
-            const dayNum = idx + 1;
-            const timeframeStr = `Próximas ${dayNum * 24}h`;
-            
-            if (!risingStations.some(r => r.name === sName && r.timeframe === timeframeStr)) {
-              risingStations.push({
-                name: sName,
-                currentIdt: curIdt,
-                predictedIdt: forecastedIdt,
-                timeframe: timeframeStr,
-                level: forecastedLevel
-              });
-            }
-          }
-        });
-      }
-    });
-  }
+  // Análise epidemiológica dinâmica de fallback
+  let healthAlertLevel: HealthPathologiesReport['alertLevel'] = 'Baixo';
+  let immediateImpacts = "";
+  let chronicAggravation = "";
+  let vectorialRisk = "";
+  let vulnerableGroups = "Idosos, crianças (menores de 5 anos), gestantes, pessoas com comorbidades (cardiopatas e pneumopatas), trabalhadores ao ar livre e populações vulneráveis.";
+  let protectionRecommendations: string[] = [];
 
-  risingStations.slice(0, 3).forEach((r, idx) => {
-    let title = "";
-    let desc = "";
-    let type: 'HEALTH' | 'TRAFFIC' | 'CIVIL_DEFENSE' = "CIVIL_DEFENSE";
-
-    if (r.level === 'NIVEL_2' || r.level === 'NIVEL_3') {
-      type = "CIVIL_DEFENSE";
-      title = `Prevenção Climatológica (${r.timeframe}) - ${r.name}`;
-      desc = `Projeção matemática (Holt) aponta elevação crítica da sensação térmica para ${r.predictedIdt}°C. Recomenda-se pré-alertar hospitais e preparar planos de contingência locais.`;
-    } else {
-      type = "HEALTH";
-      title = `Alerta Preventivo (${r.timeframe}) - ${r.name}`;
-      desc = `Previsão de aumento de sensação térmica de ${r.currentIdt}°C para ${r.predictedIdt}°C. Recomendamos divulgar cuidados básicos com hidratação e insolação preventiva.`;
-    }
-
-    recommendations.push({
-      id: `rec-pred-${idx}`,
-      type,
-      title,
-      description: desc,
-      timeframe: r.timeframe,
-      targetStation: r.name
-    });
-  });
-
-  if (recommendations.filter(r => r.id.startsWith('rec-pred')).length === 0 && forecasts && forecasts.length > 0) {
-    const highestFuture = forecasts.map((f: any) => {
-      const maxVal = f.idtForecast && f.idtForecast.length > 0 
-        ? Math.max(...f.idtForecast.map((d: any) => d.value)) 
-        : 28;
-      return { name: f.name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', ''), maxVal };
-    }).sort((a, b) => b.maxVal - a.maxVal)[0];
-
-    if (highestFuture) {
-      recommendations.push({
-        id: "rec-pred-default",
-        type: "CIVIL_DEFENSE",
-        title: `Manutenção de Alerta - ${highestFuture.name}`,
-        description: `Tendência estável de sensação térmica em torno de ${highestFuture.maxVal.toFixed(1)}°C nos próximos 3 dias. Manter rotina de monitoramento.`,
-        timeframe: "Próximas 48h",
-        targetStation: highestFuture.name
-      });
-    }
-  }
-
-  let report = "";
-  if (criticalStation) {
-    const sName = (criticalStation as StationData).name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '');
-    report = `Análise Preditiva Dinâmica: Atualmente, a rede de monitoramento registra nível de ${currentLevelName} devido à sensação de ${(criticalStation as StationData).idt}°C no bairro ${sName}. `;
-    
-    if (risingStations.length > 0) {
-      const risingText = risingStations.map(r => `${r.name} (${r.predictedIdt}°C em ${r.timeframe})`).join(', ');
-      report += `Modelos matemáticos de Holt preveem aquecimento e maior estresse térmico para: ${risingText}. A Defesa Civil de Fortaleza recomenda ativação imediata de protocolos preventivos de hidratação e restrição de trabalho externo nessas áreas.`;
-    } else {
-      report += `As projeções de curto prazo para os próximos 3 dias indicam estabilização térmica e manutenção das condições normais na malha urbana de Fortaleza.`;
-    }
+  if (maxIdt >= 40 || maxTemp >= 38) {
+    healthAlertLevel = 'Extremo';
+    immediateImpacts = `Com a sensação térmica atingindo ${maxIdt.toFixed(1)}°C em ${sName}, o corpo humano perde a capacidade de termorregulação eficiente. Há risco altíssimo e imediato de Desidratação severa, Estresse térmico, Exaustão pelo calor e quadros agudos de Insolação, com perigo à vida para grupos expostos sem refrigeração.`;
+    chronicAggravation = `O esforço metabólico compensatório provoca forte vasodilatação periférica, sobrecarregando criticamente o sistema cardiovascular. Risco iminente de descompensação grave levando a Infarto agudo do miocárdio, Insuficiência cardíaca e Acidente Vascular Cerebral (AVC). O ar aquecido e a poluição urbana agravam crises agudas de Asma, DPOC e Infecções respiratórias.`;
+    vectorialRisk = `A temperatura elevada (${maxTemp.toFixed(1)}°C) somada à umidade acelera a eclosão de ovos e reduz o ciclo reprodutivo de mosquitos vetores. Alerta vermelho para proliferação acelerada de transmissores de Dengue, Zika e Chikungunya. Atenção acrescida para Febre do Oropouche, Malária e Leishmaniose.`;
+    protectionRecommendations = [
+      `Suspender imediatamente atividades físicas e laborais pesadas ao ar livre entre 10h e 16h em ${sName}.`,
+      `Forçar hidratação constante mesmo sem sensação de sede, priorizando idosos e crianças.`,
+      `Reforçar plantões nas UPAs e emergências cardiológicas para pronto atendimento de infartos e AVCs.`,
+      `Intensificar fumacê e eliminação de focos de Aedes aegypti e outros vetores cujo ciclo é encurtado pelo calor.`,
+      `Manter pontos de resfriamento e distribuição de água potável em áreas de grande circulação.`
+    ];
+  } else if (maxIdt >= 32.1 || maxTemp >= 32) {
+    healthAlertLevel = 'Alto';
+    immediateImpacts = `Sensação térmica crítica de ${maxIdt.toFixed(1)}°C no bairro ${sName}. Risco elevado de Estresse térmico, Exaustão pelo calor e Desidratação progressiva após exposição contínua ao sol.`;
+    chronicAggravation = `Vasodilatação periférica compensatória eleva o débito cardíaco, aumentando a vulnerabilidade a quadros de Infarto agudo do miocárdio, AVC e sobrecarga na Insuficiência cardíaca. Portadores de Asma e DPOC requerem atenção com a qualidade e temperatura do ar.`;
+    vectorialRisk = `Condições térmicas favoráveis para o desenvolvimento de larvas de Aedes aegypti (Dengue, Zika, Chikungunya) e vetores de Leishmaniose nas zonas de microclima úmido.`;
+    protectionRecommendations = [
+      `Orientar hidratação constante e uso de proteção solar/sombras.`,
+      `Determinar pausas obrigatórias de descanso para trabalhadores ao ar livre.`,
+      `Monitorar de perto idosos e crianças pequenas nas comunidades prioritárias.`,
+      `Reforçar a vigilância de vetores e combate à água parada nos bairros mais quentes.`
+    ];
+  } else if (maxIdt >= 27.1) {
+    healthAlertLevel = 'Moderado';
+    immediateImpacts = `Sensação térmica de ${maxIdt.toFixed(1)}°C em ${sName}. Risco moderado de fadiga, perda de eletrólitos e desconforto térmico em tarefas físicas contínuas.`;
+    chronicAggravation = `Sensação térmica requer atenção leve para pacientes cardiopatas e hipertensos. Pacientes com Asma e DPOC devem manter medicação regular.`;
+    vectorialRisk = `Monitoramento epidemiológico regular de vetores de arboviroses (Dengue, Chikungunya, Zika).`;
+    protectionRecommendations = [
+      `Manter boa ingestão hídrica ao longo do dia.`,
+      `Evitar esforço físico excessivo sob sol forte no meio do dia.`,
+      `Verificar recipientes que possam acumular água parada.`
+    ];
   } else {
-    report = `Sistema operando em modo de segurança. Sensores sob monitoramento de rotina. Sem alterações térmicas esperadas para as próximas 72 horas.`;
+    healthAlertLevel = 'Baixo';
+    immediateImpacts = `Condições térmicas dentro do padrão de conforto para a população de Fortaleza.`;
+    chronicAggravation = `Estabilidade clínica esperada para portadores de doenças cardiovasculares e respiratórias.`;
+    vectorialRisk = `Índices epidemiológicos vetoriais em nível de rotina.`;
+    protectionRecommendations = [
+      `Manter hábitos saudáveis de hidratação e higiene ambiental.`
+    ];
   }
+
+  let report = `Análise Preditiva e Epidemiológica: Atualmente, a rede de estações automáticas indica o bairro ${sName} como ponto de atenção máxima (${maxTemp.toFixed(1)}°C reais, sensação de ${maxIdt.toFixed(1)}°C - Nível ${currentLevelName}). Alerta de saúde classificado como ${healthAlertLevel.toUpperCase()}. A Defesa Civil de Fortaleza recomenda ativação das medidas preventivas descritas no boletim.`;
 
   return {
     report,
-    recommendations: recommendations.slice(0, 5)
+    recommendations: recommendations.slice(0, 5),
+    healthReport: {
+      alertLevel: healthAlertLevel,
+      immediateImpacts,
+      chronicAggravation,
+      vectorialRisk,
+      vulnerableGroups,
+      protectionRecommendations
+    }
   };
 }
 
@@ -283,44 +257,49 @@ export default async function handler(req: any, res: any) {
   }
 
   const prompt = `
-[PROMPT DE SISTEMA: MOTOR DE ALERTA CLIMÁTICO E PREDITIVO - DEFESA CIVIL DE FORTALEZA]
+[PROMPT DE SISTEMA: MOTOR DE ALERTA CLIMÁTICO, PREDITIVO E DE SAÚDE PÚBLICA - DEFESA CIVIL DE FORTALEZA]
 
 Contexto e Papel:
-Você é o motor analítico preditivo do Observatório de Riscos Climáticos de Fortaleza. Sua função é analisar dados meteorológicos em tempo real e as projeções matemáticas de 3 dias para calcular índices de desconforto térmico, prever picos de calor e gerar recomendações e protocolos preventivos ativados por prazo (ex: alertas antecipados de 24h, 48h ou 72h).
+Você é o motor analítico preditivo e epidemiológico do Observatório de Riscos Climáticos de Fortaleza. Sua função é analisar dados meteorológicos em tempo real e projeções de 3 dias para calcular índices de desconforto térmico, prever picos de calor e emitir o BOLETIM DE IMPACTOS À SAÚDE E PATOLOGIAS CLIMA-SENSÍVEIS e PROTOCOLOS DE AÇÃO.
 
-Dados em tempo real das estações:
+Dados em tempo real das estações automáticas:
 ${stationSummary}
 
 Previsão Preditiva (Próximos 3 Dias) via Modelo de Holt:
 ${forecastSummary}
 
-Regras de Processamento (Aclimatação da População):
-A zona de desconforto crítico em Fortaleza só se inicia a partir de um Índice de Calor (HI) ou Temperatura Aparente (IDT) de 32,1°C devido à aclimatação tropical, ventos alísios constantes e umidade.
+BASE DE CONHECIMENTO OBRIGATÓRIA (Doenças sensíveis ao clima):
+1. Vetoriais (Agravadas por calor associado à chuva/água parada ou histórico de precipitação/alta umidade): Dengue, Zika, Chikungunya, Malária, Febre amarela, Febre do Oropouche, Leishmaniose, Doença de Chagas, Filariose linfática, Esquistossomose, Febre maculosa.
+2. Respiratórias (Agravadas por ar seco, frio extremo, ou calor extremo com poluição): Asma, Doença Pulmonar Obstrutiva Crônica (DPOC), Pneumonia, Infecções respiratórias agudas, Influenza (gripe).
+3. Cardiovasculares (Agravadas por estresse térmico, tanto calor extremo quanto frio extremo): Infarto agudo do miocárdio, Acidente Vascular Cerebral (AVC), Insuficiência cardíaca.
+4. Relacionadas ao calor (Causadas diretamente por altas temperaturas e sensação térmica): Insolação, Exaustão pelo calor, Desidratação, Estresse térmico.
 
-Parâmetros de Gatilho e Estabilidade (Thresholds de Segurança):
-Classifique o cenário das estações (tanto atual quanto futuro) nestas faixas:
-- Nível 0 (Seguro/Rotina): HI/IDT até 27°C. Sem impactos esperados.
-- Nível 1 (ATENÇÃO / Cuidado): HI/IDT entre 27,1°C e 32°C. Possível fadiga. Requer informes preventivos.
-- Nível 2 (ALERTA / Cuidado Extremo): HI/IDT entre 32,1°C e 41°C. Risco de insolação. Orientações de saúde necessárias.
-- Nível 3 (ALARME / Perigo Extremo): HI/IDT acima de 41,1°C. Risco iminente de colapso térmico.
+GRUPOS VULNERÁVEIS PRIORITÁRIOS:
+Idosos, crianças (especialmente menores de 5 anos), gestantes, pessoas com comorbidades (cardiopatas e pneumopatas), trabalhadores ao ar livre e populações em situação de rua ou sem acesso a refrigeração/saneamento.
 
-Diretrizes de Análise Preditiva:
-1. Compare os valores atuais com as previsões para os dias +1, +2 e +3.
-2. Identifique tendências de aumento significativo de temperatura/IDT (ilha de calor).
-3. Se alguma estação estiver prevista para subir de nível (ex: Nível 1 para Nível 2) nos próximos dias, crie recomendações de protocolo preventivo adequadas.
-4. Para cada recomendação, associe o "timeframe" correspondente (ex: "Imediato", "Próximas 24h", "Próximas 48h" ou "Próximas 72h") e a estação/bairro alvo ("targetStation").
-5. A estação que apresenta a MAIOR TEMPERATURA REAL no momento deve SEMPRE ser destacada como a principal estação em análise e ponto de atenção prioritário.
+REGRAS OBRIGATÓRIAS:
+- Seja direto, científico, fisiológico e use tom de urgência proporcional ao risco.
+- Baseie as análises de patologias ESTRITAMENTE na Base de Conhecimento fornecida.
+- Se o Índice de Calor ou Temperatura Aparente (IDT) atingir ou ultrapassar 40°C em qualquer estação (ex: Centro, Montese, etc.), o alerta para problemas cardiovasculares e estresse térmico DEVE ser classificado como EXTREMO ("Extremo") e considerado fatal para grupos vulneráveis desprotegidos.
+- A estação que apresenta a MAIOR TEMPERATURA REAL/IDT no momento deve SEMPRE ser destacada como o ponto de atenção prioritário.
 
 Instruções de Saída:
 Analise os dados e gere um JSON contendo:
-1. "report": Um Resumo Executivo conciso em português, focado nas condições atuais e nas principais ameaças preditivas identificadas para os próximos 3 dias (mencione os bairros que exigem mais atenção preventiva).
-2. "recommendations": Uma lista de ações preventivas e imediatas recomendadas no momento, classificadas por tipo (HEALTH, TRAFFIC, CIVIL_DEFENSE). Cada recomendação deve obrigatoriamente possuir os campos:
+1. "report": Resumo Executivo conciso em português, focado nas condições atuais e nas principais ameaças preditivas identificadas para os próximos 3 dias (destaque os bairros mais quentes).
+2. "recommendations": Lista de ações preventivas e imediatas recomendadas no momento, classificadas por tipo (HEALTH, TRAFFIC, CIVIL_DEFENSE). Cada recomendação deve obrigatoriamente possuir os campos:
    - "id": ID único (ex: "rec-1", "rec-2")
    - "type": 'HEALTH', 'TRAFFIC' ou 'CIVIL_DEFENSE'
    - "title": Título curto da recomendação
    - "description": Detalhes do protocolo sugerido
    - "timeframe": Prazo previsto para ativação (ex: "Imediato", "Próximas 24h", "Próximas 48h", "Próximas 72h")
    - "targetStation": O nome do bairro/estação que requer esta ação (ex: "Centro", "Montese", etc.)
+3. "healthReport": Um objeto contendo a análise epidemiológica e clínica estruturada:
+   - "alertLevel": Nível de alerta ('Baixo', 'Moderado', 'Alto', 'Extremo').
+   - "immediateImpacts": Explicação detalhada de quais doenças "Relacionadas ao calor" (Insolação, Exaustão pelo calor, Desidratação, Estresse térmico) ocorrem de imediato e o mecanismo fisiológico de termorregulação.
+   - "chronicAggravation": Explicação de quais doenças "Respiratórias" (Asma, DPOC, Pneumonia, Infecções agudas, Influenza) e "Cardiovasculares" (Infarto agudo do miocárdio, AVC, Insuficiência cardíaca) estão em risco iminente de descompensação e o mecanismo sistêmico (vasodilatação sobrecarregando o sistema circulatório).
+   - "vectorialRisk": Análise se a temperatura e umidade atuais favorecem a proliferação dos vetores das doenças listadas (Dengue, Zika, Chikungunya, Febre do Oropouche, Malária, etc.).
+   - "vulnerableGroups": Listagem expressa dos grupos prioritários afetados no cenário atual.
+   - "protectionRecommendations": Array com 3 a 5 ações práticas de saúde pública ou defesa civil.
   `;
 
   try {
@@ -348,9 +327,24 @@ Analise os dados e gere um JSON contendo:
                 },
                 required: ['id', 'type', 'title', 'description', 'timeframe', 'targetStation']
               }
+            },
+            healthReport: {
+              type: Type.OBJECT,
+              properties: {
+                alertLevel: { type: Type.STRING, enum: ['Baixo', 'Moderado', 'Alto', 'Extremo'] },
+                immediateImpacts: { type: Type.STRING },
+                chronicAggravation: { type: Type.STRING },
+                vectorialRisk: { type: Type.STRING },
+                vulnerableGroups: { type: Type.STRING },
+                protectionRecommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                }
+              },
+              required: ['alertLevel', 'immediateImpacts', 'chronicAggravation', 'vectorialRisk', 'vulnerableGroups', 'protectionRecommendations']
             }
           },
-          required: ['report', 'recommendations']
+          required: ['report', 'recommendations', 'healthReport']
         }
       }
     });
