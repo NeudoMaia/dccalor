@@ -9,6 +9,9 @@ services:
     restart: always
     ports:
       - "${PORT:-3000}:3000"
+    networks:
+      - rdc_network
+      - default
     env_file:
       - .env
     environment:
@@ -21,3 +24,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+networks:
+  rdc_network:
+    name: rdc-sistema_rdc_network
+    external: true
+
