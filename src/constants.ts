@@ -18,6 +18,8 @@ const REF_TEMP = 29.5; // Temperatura de referência inicial (Messejana)
 
 export const FORTALEZA_CENTER: [number, number] = [-3.76, -38.53];
 
+export const CARTO_API_KEY = (import.meta as any).env?.VITE_CARTO_API_KEY || 'cb1_2t7z_1_b4192d625bdc678b8f9125ad';
+
 export const INITIAL_STATIONS: StationData[] = [
   {
     id: 'st-01',

@@ -8,7 +8,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { StationData } from '../../types';
-import { FORTALEZA_CENTER } from '../../constants';
+import { FORTALEZA_CENTER, CARTO_API_KEY } from '../../constants';
 import { generateIDWGrid, FORTALEZA_BOUNDS, idtToColor } from '../../lib/idw';
 
 // Fix for default marker icons
@@ -137,7 +137,7 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
         scrollWheelZoom={false}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url={`https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''}`}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
         <InvalidateMap />

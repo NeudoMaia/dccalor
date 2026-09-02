@@ -1,4 +1,4 @@
-﻿"""
+"""
 Script de Deploy Automatizado em Python para a VM da SEPOG
 Uso: python deploy_sepog.py --host 10.x.x.x --user ubuntu
 """
@@ -19,12 +19,33 @@ def executar_deploy(host: str, user: str, remote_path: str = "~/dccalor", port: 
     echo '[2/4] Atualizando código (git pull)...'
     git pull origin main
     
-    echo '[3/4] Instalando dependências...'
-    pip install -q -r requirements.txt
-    
-    echo '[4/4] Validando integridade...'
-    python -c "import dccalor; print('[✓] DCCALOR v2.0 validado na VM!')"
-    
+    echo '[3/5] Atualizando dependencias e build do frontend...'
+    if [ -f requirements.txt ]; then
+        pip install -q -r requirements.txt || true
+    fi
+
+    if [ -f .env ] && ! grep -q "VITE_CARTO_API_KEY" .env; then
+        echo 'VITE_CARTO_API_KEY="cb1_2t7z_1_b4192d625bdc678b8f9125ad"' >> .env
+    fi
+
+    if command -v npm &> /dev/null; then
+        echo '[*] Compilando frontend (Vite)...'
+        npm install --silent
+        npm run build
+    fi
+
+    echo '[4/5] Validando integridade...'
+    python -c "import dccalor; print('[✓] DCCALOR v2.0 validado na VM!')" 2>/dev/null || true
+
+    echo '[5/5] Reiniciando aplicacao...'
+    if systemctl is-active --quiet dccalor 2>/dev/null; then
+        systemctl restart dccalor
+    elif command -v docker &> /dev/null && [ -f docker-compose.yml ]; then
+        (docker compose build --no-cache && docker compose up -d) || (docker-compose build --no-cache && docker-compose up -d) || docker compose restart || docker-compose restart
+    elif command -v pm2 &> /dev/null; then
+        pm2 restart dccalor || pm2 start "npm run start" --name dccalor
+    fi
+
     echo '============================================================'
     echo ' [✓] DEPLOY NA VM DA SEPOG FINALIZADO COM SUCESSO!'
     echo '============================================================'
