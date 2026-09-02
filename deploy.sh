@@ -20,7 +20,15 @@ if [ ! -f .env ]; then
     echo "[IMPORTANTE] Por favor, configure suas credenciais no arquivo .env antes de prosseguir!"
 fi
 
-# 3. Escolha do método de execução (Docker ou PM2/Nginx)
+if [ -f .env ] && ! grep -q "VITE_CARTO_API_KEY" .env; then
+    echo 'VITE_CARTO_API_KEY="cb1_2t7z_1_b4192d625bdc678b8f9125ad"' >> .env
+fi
+
+if [ -f requirements.txt ]; then
+    pip install -q -r requirements.txt || true
+fi
+
+# 3. Escolha do método de execução (Docker ou PM2/Nginx/Systemd)
 if command -v docker &> /dev/null && command -v docker-compose &> /dev/null || docker compose version &> /dev/null; then
     echo "[2/4] Docker detectado. Construindo e subindo containers..."
     docker compose down || true
@@ -32,11 +40,14 @@ if command -v docker &> /dev/null && command -v docker-compose &> /dev/null || d
     docker compose ps
     echo "DCCALOR rodando com sucesso via Docker!"
 else
-    echo "[2/4] Modo nativo Node.js/PM2..."
+    echo "[2/4] Modo nativo Node.js..."
     npm install
     npm run build
     
-    if command -v pm2 &> /dev/null; then
+    if systemctl is-active --quiet dccalor 2>/dev/null; then
+        echo "[3/4] Reiniciando serviço systemd dccalor..."
+        systemctl restart dccalor
+    elif command -v pm2 &> /dev/null; then
         echo "[3/4] Reiniciando aplicação no PM2..."
         pm2 restart dccalor || pm2 start "npm run start" --name dccalor
         pm2 save
