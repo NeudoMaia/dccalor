@@ -46,21 +46,24 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 function generateDynamicFallback(stations: StationData[], forecasts?: any[]): AIAnalysis {
   const recommendations: any[] = [];
   
-  let maxTemp = -Infinity;
-  let maxIdt = -Infinity;
-  let criticalStation: StationData | null = null;
-  
-  stations.forEach(s => {
-    if (s.temp > maxTemp) {
-      maxTemp = s.temp;
-    }
-    if (s.idt > maxIdt) {
-      maxIdt = s.idt;
-      criticalStation = s;
-    }
+  if (!stations || stations.length === 0) {
+    return {
+      report: "Rede de monitoramento operando em rotina. Sensores sob acompanhamento contínuo.",
+      recommendations: []
+    };
+  }
+
+  // Ordenar prioritariamente pela maior Temperatura Real do Ar (OMM)
+  const sorted = [...stations].sort((a, b) => {
+    if (b.temp !== a.temp) return b.temp - a.temp;
+    return b.idt - a.idt;
   });
 
-  const currentLevel = criticalStation ? (criticalStation as StationData).status : 'NIVEL_0';
+  const criticalStation = sorted[0];
+  const maxTemp = criticalStation ? criticalStation.temp : 28;
+  const maxIdt = criticalStation ? criticalStation.idt : 30;
+
+  const currentLevel = criticalStation ? criticalStation.status : 'NIVEL_0';
   const currentLevelName = 
     currentLevel === 'NIVEL_3' ? 'Alarme' :
     currentLevel === 'NIVEL_2' ? 'Alerta' :
@@ -240,9 +243,19 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const stationSummary = payload.stations.map((s) => (
-    `${s.name}: ${s.temp}°C (IDT: ${s.idt}, ICU: +${s.icu}°C, Status: ${s.status}${s.isReference ? ' [REF]' : ''})`
-  )).join(', ');
+  // 1. Ordenação rigorosa por Temperatura Real do Ar (Critério Termodinâmico OMM)
+  const sortedStations = [...payload.stations].sort((a, b) => {
+    if (b.temp !== a.temp) return b.temp - a.temp;
+    return b.idt - a.idt;
+  });
+  const hottestStation = sortedStations[0];
+  const sHottestName = hottestStation 
+    ? hottestStation.name.replace(' (Ref. Térmica)', '').replace(' (Ref. T\u00e9rmica)', '') 
+    : 'Fortaleza';
+
+  const stationSummary = sortedStations.map((s, idx) => (
+    `${idx + 1}º ${s.name}: ${s.temp}°C reais (Sensação Térmica/IDT: ${s.idt}°C, ICU: +${s.icu}°C, Status: ${s.status}${s.isReference ? ' [REF]' : ''})`
+  )).join('\n');
 
   let forecastSummary = "";
   if (payload.forecasts && payload.forecasts.length > 0) {
@@ -262,7 +275,7 @@ export default async function handler(req: any, res: any) {
 Contexto e Papel:
 Você é o motor analítico preditivo e epidemiológico do Observatório de Riscos Climáticos de Fortaleza. Sua função é analisar dados meteorológicos em tempo real e projeções de 3 dias para calcular índices de desconforto térmico, prever picos de calor e emitir o BOLETIM DE IMPACTOS À SAÚDE E PATOLOGIAS CLIMA-SENSÍVEIS e PROTOCOLOS DE AÇÃO.
 
-Dados em tempo real das estações automáticas:
+Dados em tempo real das estações automáticas (ordenadas da MAIOR para a MENOR Temperatura Real):
 ${stationSummary}
 
 Previsão Preditiva (Próximos 3 Dias) via Modelo de Holt:
@@ -281,7 +294,9 @@ REGRAS OBRIGATÓRIAS:
 - Seja direto, científico, fisiológico e use tom de urgência proporcional ao risco.
 - Baseie as análises de patologias ESTRITAMENTE na Base de Conhecimento fornecida.
 - Se o Índice de Calor ou Temperatura Aparente (IDT) atingir ou ultrapassar 40°C em qualquer estação (ex: Centro, Montese, etc.), o alerta para problemas cardiovasculares e estresse térmico DEVE ser classificado como EXTREMO ("Extremo") e considerado fatal para grupos vulneráveis desprotegidos.
-- A estação que apresenta a MAIOR TEMPERATURA REAL/IDT no momento deve SEMPRE ser destacada como o ponto de atenção prioritário.
+- CRITÉRIO OBRIGATÓRIO DE DESTAQUE TÉRMICO (PADRÃO OMM): A estação que apresenta a MAIOR TEMPERATURA REAL DO AR (°C) deve SEMPRE ser destacada como o ponto de atenção prioritário e o bairro mais quente de Fortaleza.
+- No momento atual da rede, a estação com a MAIOR TEMPERATURA REAL comprovada é "${sHottestName}" com ${hottestStation?.temp}°C reais (sensação de ${hottestStation?.idt}°C).
+- O seu resumo executivo ("report") e as principais recomendações DEVEM obrigatoriamente focar em "${sHottestName}" como o ponto prioritário de calor da cidade. NÃO aponte outro bairro como o mais quente a menos que ele possua temperatura real (°C) comprovadamente superior. Não confunda o índice de sensação térmica (IDT) pontualmente alto por falta de vento com a temperatura real do ar.
 
 Instruções de Saída:
 Analise os dados e gere um JSON contendo:
