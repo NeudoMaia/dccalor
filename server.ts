@@ -54,6 +54,7 @@ app.all('/api/analyze', async (req, res) => {
 // Servir arquivos estáticos do frontend (dist)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
+app.use('/dccalor', express.static(distPath));
 
 // Fallback para SPA (qualquer rota desconhecida direciona para index.html)
 app.get('*', (req, res) => {

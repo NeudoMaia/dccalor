@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Layers } from 'lucide-react';
 import { StationData } from '../../types';
 import { FORTALEZA_CENTER, CARTO_API_KEY } from '../../constants';
 import { generateIDWGrid, FORTALEZA_BOUNDS, idtToColor } from '../../lib/idw';
@@ -116,7 +117,155 @@ function IDWOverlay({ stations }: { stations: StationData[] }) {
   return null;
 }
 
+/**
+ * MunicipalityBoundaryLayer — Renderiza os limites oficiais do município de Fortaleza
+ * de forma permanente sobre o mapa (IBGE).
+ */
+function MunicipalityBoundaryLayer() {
+  const map = useMap();
+  const layerRef = useRef<L.GeoJSON | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const geojsonBase = window.location.pathname.startsWith('/dccalor') ? '/dccalor' : '';
+
+    fetch(`${geojsonBase}/municipio_fortaleza.geojson`)
+      .then(res => res.json())
+      .then(geoData => {
+        if (!isMounted) return;
+        if (layerRef.current) {
+          layerRef.current.remove();
+        }
+        const layer = L.geoJSON(geoData, {
+          style: {
+            color: '#1d4ed8', // Azul royal escuro
+            weight: 2.5,
+            opacity: 0.9,
+            dashArray: '8, 6',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.02
+          },
+          interactive: false
+        });
+        layer.addTo(map);
+        layerRef.current = layer;
+      })
+      .catch(err => console.warn('Aviso: Limite municipal não pôde ser carregado:', err));
+
+    return () => {
+      isMounted = false;
+      if (layerRef.current) {
+        layerRef.current.remove();
+        layerRef.current = null;
+      }
+    };
+  }, [map]);
+
+  return null;
+}
+
+/**
+ * NeighborhoodsLayer — Renderiza a malha com os 121 bairros oficiais de Fortaleza
+ * sob demanda quando a opção "Bairros de Fortaleza" estiver selecionada.
+ */
+function NeighborhoodsLayer({ visible }: { visible: boolean }) {
+  const map = useMap();
+  const layerRef = useRef<L.GeoJSON | null>(null);
+  const dataCacheRef = useRef<any>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!visible) {
+      if (layerRef.current) {
+        layerRef.current.remove();
+        layerRef.current = null;
+      }
+      return;
+    }
+
+    const renderBairros = (geoData: any) => {
+      if (!isMounted) return;
+      if (layerRef.current) {
+        layerRef.current.remove();
+      }
+
+      const layer = L.geoJSON(geoData, {
+        style: () => ({
+          color: '#475569',
+          weight: 1.2,
+          opacity: 0.7,
+          dashArray: '4, 4',
+          fillColor: '#64748b',
+          fillOpacity: 0.04
+        }),
+        onEachFeature: (feature, l) => {
+          const nome = feature.properties?.nome || 'Bairro';
+          l.bindTooltip(`
+            <div style="font-family: inherit; font-size: 11px; font-weight: bold; color: #1e293b; padding: 2px 4px;">
+              ${nome}
+            </div>
+          `, {
+            permanent: false,
+            direction: 'center',
+            className: 'bairro-tooltip-popup'
+          });
+
+          l.on({
+            mouseover: (e) => {
+              const target = e.target;
+              target.setStyle({
+                weight: 2.2,
+                color: '#2563eb',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.18,
+                dashArray: undefined
+              });
+              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                target.bringToFront();
+              }
+            },
+            mouseout: (e) => {
+              if (layerRef.current) {
+                layerRef.current.resetStyle(e.target);
+              }
+            }
+          });
+        }
+      });
+
+      layer.addTo(map);
+      layerRef.current = layer;
+    };
+
+    if (dataCacheRef.current) {
+      renderBairros(dataCacheRef.current);
+    } else {
+      const geojsonBase = window.location.pathname.startsWith('/dccalor') ? '/dccalor' : '';
+      fetch(`${geojsonBase}/bairros_fortaleza.geojson`)
+        .then(res => res.json())
+        .then(geoData => {
+          dataCacheRef.current = geoData;
+          renderBairros(geoData);
+        })
+        .catch(err => console.warn('Aviso: Bairros de Fortaleza não puderam ser carregados:', err));
+    }
+
+    return () => {
+      isMounted = false;
+      if (layerRef.current) {
+        layerRef.current.remove();
+        layerRef.current = null;
+      }
+    };
+  }, [map, visible]);
+
+  return null;
+}
+
 export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
+  const [showBairros, setShowBairros] = useState(false);
+
   const getCircleColor = (status: string) => {
     switch (status) {
       case 'NIVEL_0': return '#10b981';
@@ -141,6 +290,8 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
         <InvalidateMap />
+        <MunicipalityBoundaryLayer />
+        <NeighborhoodsLayer visible={showBairros} />
         <IDWOverlay stations={stations} />
         
         {stations.map(station => (
@@ -169,6 +320,34 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
           </React.Fragment>
         ))}
       </MapContainer>
+
+      {/* Caixa de Opções: Camadas do Mapa */}
+      <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-slate-200 shadow-xl z-[400] flex flex-col gap-2 min-w-[210px]">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Camadas do Mapa</span>
+          </div>
+          <span className="text-[9px] font-bold text-slate-400 uppercase">Fortaleza</span>
+        </div>
+
+        {/* Opção Bairros de Fortaleza */}
+        <label className="flex items-center gap-2.5 text-xs font-bold text-slate-700 cursor-pointer hover:text-blue-600 transition-colors select-none py-0.5">
+          <input 
+            type="checkbox"
+            checked={showBairros}
+            onChange={(e) => setShowBairros(e.target.checked)}
+            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer accent-blue-600"
+          />
+          <span>Bairros de Fortaleza</span>
+        </label>
+
+        {/* Limite Municipal Permanente */}
+        <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">
+          <span className="w-4 h-0.5 border-b-2 border-blue-700 border-dashed inline-block"></span>
+          <span>Limite Municipal (Permanente)</span>
+        </div>
+      </div>
 
       {/* Map Legend */}
       <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur p-4 rounded-2xl border border-slate-200 shadow-xl z-[400] text-xs pointer-events-none">
@@ -204,8 +383,19 @@ export const HeatMap: React.FC<HeatMapProps> = ({ stations }) => {
             ></span>
             <span className="font-bold text-slate-600">Interpolação IDW (IDT)</span>
           </div>
+          {/* Limite Municipal */}
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-200">
+            <span className="w-4 h-0.5 border-b-2 border-blue-700 border-dashed inline-block"></span>
+            <span className="font-bold text-slate-600">Limite Municipal (Fixo)</span>
+          </div>
+          {showBairros && (
+            <div className="flex items-center gap-3">
+              <span className="w-4 h-0.5 border-b-2 border-slate-500 border-dotted inline-block"></span>
+              <span className="font-bold text-slate-600">Bairros de Fortaleza</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-}
+};
