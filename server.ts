@@ -51,8 +51,26 @@ app.all('/api/analyze', async (req, res) => {
   }
 });
 
+// Middleware para normalizar múltiplas barras na URL (ex: //municipio -> /municipio)
+app.use((req, res, next) => {
+  if (req.url.includes('//')) {
+    req.url = req.url.replace(/\/{2,}/g, '/');
+  }
+  next();
+});
+
 // Servir arquivos estáticos do frontend (dist)
 const distPath = path.join(__dirname, 'dist');
+
+// Rotas explícitas para GeoJSONs do mapa de Fortaleza
+app.get(['/municipio_fortaleza.geojson', '/dccalor/municipio_fortaleza.geojson'], (req, res) => {
+  res.sendFile(path.join(distPath, 'municipio_fortaleza.geojson'));
+});
+
+app.get(['/bairros_fortaleza.geojson', '/dccalor/bairros_fortaleza.geojson'], (req, res) => {
+  res.sendFile(path.join(distPath, 'bairros_fortaleza.geojson'));
+});
+
 app.use(express.static(distPath));
 app.use('/dccalor', express.static(distPath));
 
