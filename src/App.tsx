@@ -60,8 +60,14 @@ function Dashboard() {
       };
     });
 
-    // Ordenar pela maior média de sensação térmica nos últimos 7 dias
-    return stationsStats.sort((a, b) => b.avgIDT - a.avgIDT)[0];
+    // Ordenar pela maior média de temperatura real dos últimos 7 dias (critério termodinâmico OMM)
+    // Usando a sensação térmica (avgIDT) como critério técnico de desempate
+    return stationsStats.sort((a, b) => {
+      if (Math.abs(b.avgTemp - a.avgTemp) > 0.05) {
+        return b.avgTemp - a.avgTemp;
+      }
+      return b.avgIDT - a.avgIDT;
+    })[0];
   }, [stations]);
 
   const getPageTitle = () => {
@@ -103,17 +109,17 @@ function Dashboard() {
                         {weeklyAttentionStation?.primaryArea || weeklyAttentionStation?.name}
                       </h3>
                       <p className="text-[9px] text-slate-500 font-bold mt-1 uppercase tracking-tighter">
-                        Maior Média Semanal
+                        Maior Média Térmica Semanal
                       </p>
                     </div>
                     <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Média ST (7d)</span>
-                        <span className="text-sm font-mono font-bold text-red-600">{weeklyAttentionStation?.avgIDT.toFixed(1)}°C</span>
-                      </div>
-                      <div className="flex justify-between items-center">
                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Média Temp Real</span>
                         <span className="text-sm font-mono font-bold text-orange-600">{weeklyAttentionStation?.avgTemp.toFixed(1)}°C</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Média ST (7d)</span>
+                        <span className="text-sm font-mono font-bold text-red-600">{weeklyAttentionStation?.avgIDT.toFixed(1)}°C</span>
                       </div>
                       <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100">
                         <span className="text-[10px] font-black text-orange-800 uppercase tracking-wider">Gradiente (7d)</span>

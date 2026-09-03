@@ -116,13 +116,21 @@ export const HISTORICAL_DATA = generateHistoricalData();
  * Usadas para calcular a anomalia: avgAnomaly = T_atual − baseline.
  */
 export const HISTORICAL_BASELINES: Record<string, number> = {
-  'st-01': parseFloat((HISTORICAL_DATA.reduce((s, d) => s + d.messejana, 0) / HISTORICAL_DATA.length).toFixed(2)),  // ~28.59
-  'st-02': parseFloat((HISTORICAL_DATA.reduce((s, d) => s + d.montese, 0) / HISTORICAL_DATA.length).toFixed(2)),    // ~31.04
-  'st-03': parseFloat((HISTORICAL_DATA.reduce((s, d) => s + d.centro, 0) / HISTORICAL_DATA.length).toFixed(2)),     // ~32.39
-  // Aliases para IDs de produção reais da Plugfield
-  '9169': parseFloat((HISTORICAL_DATA.reduce((s, d) => s + d.messejana, 0) / HISTORICAL_DATA.length).toFixed(2)),
-  '8836': parseFloat((HISTORICAL_DATA.reduce((s, d) => s + d.montese, 0) / HISTORICAL_DATA.length).toFixed(2)),
-  '8642': parseFloat((HISTORICAL_DATA.reduce((s, d) => s + d.centro, 0) / HISTORICAL_DATA.length).toFixed(2)),
+  'st-01': 28.59,
+  'st-02': 31.04,
+  'st-03': 32.39,
+  // Baselines climatológicas das 11 estações automáticas da Defesa Civil (série desde Set/2025)
+  '9169': 28.59, // Messejana
+  '8836': 31.04, // Montese
+  '8642': 32.39, // Centro
+  '9281': 29.80, // Benfica
+  '9134': 30.10, // Conjunto Esperança
+  '9282': 30.90, // Granja Lisboa
+  '9242': 29.50, // Guararapes (Ref. Térmica)
+  '9249': 30.20, // Jangurussu
+  '9137': 29.10, // Mucuripe
+  '8869': 28.90, // Vila Velha
+  '3318': 29.70, // Dom Lustosa
 };
 
 /**

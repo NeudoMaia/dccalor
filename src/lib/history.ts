@@ -17,7 +17,7 @@ export interface DailyData {
  */
 export function generateAnchoredHistory(station: StationData, days: number = 31): DailyData[] {
   const hash = station.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-  const baseTemp = HISTORICAL_BASELINES[parseInt(station.id)] || 29.0;
+  const baseTemp = HISTORICAL_BASELINES[String(station.id)] || HISTORICAL_BASELINES[parseInt(station.id)] || 29.0;
   
   const today = new Date();
   
@@ -57,7 +57,7 @@ export function generateAnchoredHistory(station: StationData, days: number = 31)
   const finalHistory: DailyData[] = rawCurve.map(item => {
     const anchoredTemp = parseFloat((item.t + tempOffset).toFixed(1));
     const anchoredHum = Math.round(item.h + humOffset);
-    const anchoredWind = Math.max(0, parseFloat((item.w + windOffset).toFixed(1)));
+    const anchoredWind = Math.max(0.8, parseFloat((item.w + windOffset).toFixed(1)));
     const anchoredRad = Math.max(0, parseFloat((item.sr + radOffset).toFixed(1)));
     
     return {
