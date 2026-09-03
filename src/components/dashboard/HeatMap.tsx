@@ -11,6 +11,7 @@ import { Layers } from 'lucide-react';
 import { StationData } from '../../types';
 import { FORTALEZA_CENTER, CARTO_API_KEY } from '../../constants';
 import { generateIDWGrid, FORTALEZA_BOUNDS, idtToColor } from '../../lib/idw';
+import municipioGeoJSON from '../../data/municipio_fortaleza.json';
 
 // Fix for default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -126,34 +127,24 @@ function MunicipalityBoundaryLayer() {
   const layerRef = useRef<L.GeoJSON | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    const geojsonBase = window.location.pathname.startsWith('/dccalor') ? '/dccalor' : '';
-
-    fetch(`${geojsonBase}/municipio_fortaleza.geojson`)
-      .then(res => res.json())
-      .then(geoData => {
-        if (!isMounted) return;
-        if (layerRef.current) {
-          layerRef.current.remove();
-        }
-        const layer = L.geoJSON(geoData, {
-          style: {
-            color: '#1d4ed8', // Azul royal escuro
-            weight: 2.5,
-            opacity: 0.9,
-            dashArray: '8, 6',
-            fillColor: '#3b82f6',
-            fillOpacity: 0.02
-          },
-          interactive: false
-        });
-        layer.addTo(map);
-        layerRef.current = layer;
-      })
-      .catch(err => console.warn('Aviso: Limite municipal não pôde ser carregado:', err));
+    if (layerRef.current) {
+      layerRef.current.remove();
+    }
+    const layer = L.geoJSON(municipioGeoJSON as any, {
+      style: {
+        color: '#1d4ed8', // Azul royal escuro
+        weight: 2.5,
+        opacity: 0.9,
+        dashArray: '8, 6',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.02
+      },
+      interactive: false
+    });
+    layer.addTo(map);
+    layerRef.current = layer;
 
     return () => {
-      isMounted = false;
       if (layerRef.current) {
         layerRef.current.remove();
         layerRef.current = null;
@@ -241,14 +232,12 @@ function NeighborhoodsLayer({ visible }: { visible: boolean }) {
     if (dataCacheRef.current) {
       renderBairros(dataCacheRef.current);
     } else {
-      const geojsonBase = window.location.pathname.startsWith('/dccalor') ? '/dccalor' : '';
-      fetch(`${geojsonBase}/bairros_fortaleza.geojson`)
-        .then(res => res.json())
-        .then(geoData => {
-          dataCacheRef.current = geoData;
-          renderBairros(geoData);
+      import('../../data/bairros_fortaleza.json')
+        .then(mod => {
+          dataCacheRef.current = mod.default || mod;
+          renderBairros(dataCacheRef.current);
         })
-        .catch(err => console.warn('Aviso: Bairros de Fortaleza não puderam ser carregados:', err));
+        .catch(err => console.warn('Aviso ao carregar bairros:', err));
     }
 
     return () => {
