@@ -21,12 +21,16 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const dcpetUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? '/dcpet/'
+    : 'http://172.31.3.60/dcpet/';
+
   const items = [
     { id: 'map', label: 'Monitoramento', icon: MapIcon, category: 'Dashboard' },
     { id: 'protocols', label: 'Protocolos de Ação', icon: ShieldCheck, category: 'Dashboard' },
     { id: 'iot', label: 'Estações IoT', icon: Radio, category: 'Infraestrutura' },
     { id: 'analysis', label: 'Relatórios Históricos', icon: BarChart3, category: 'Infraestrutura' },
-    { id: 'dcpet', label: 'DCPET - Saúde Animal', icon: Heart, category: 'Sistemas Externos', url: 'https://dcpet-defesa-civil.vercel.app/' },
+    { id: 'dcpet', label: 'DCPET - Saúde Animal', icon: Heart, category: 'Sistemas Externos', url: dcpetUrl },
   ];
 
   return (
