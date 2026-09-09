@@ -20,7 +20,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rota de Healthcheck
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/dccalor/api/health'], (req, res) => {
   res.status(200).json({
     status: 'online',
     system: 'DCCALOR - Monitoramento Térmico Fortaleza',
@@ -29,7 +29,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Rotas de API
-app.all('/api/stations', async (req, res) => {
+app.all(['/api/stations', '/dccalor/api/stations'], async (req, res) => {
   try {
     await stationsHandler(req, res);
   } catch (err: any) {
@@ -40,7 +40,7 @@ app.all('/api/stations', async (req, res) => {
   }
 });
 
-app.all('/api/analyze', async (req, res) => {
+app.all(['/api/analyze', '/dccalor/api/analyze'], async (req, res) => {
   try {
     await analyzeHandler(req, res);
   } catch (err: any) {

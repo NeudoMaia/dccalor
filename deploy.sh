@@ -51,15 +51,19 @@ else
         echo "[3/4] Reiniciando aplicação no PM2..."
         pm2 restart dccalor || pm2 start "npm run start" --name dccalor
         pm2 save
-    else
-        echo "[3/4] PM2 não detectado. Iniciando com npm start..."
-        npm run start &
     fi
-    echo "[4/4] Deploy concluído!"
+    echo "[4/4] Processo concluído!"
+fi
+
+# 4. Ajustar Nginx para DCCALOR principal e DCPET subsistema
+if [ -f configurar_vm_principal.sh ]; then
+    echo "[*] Aplicando configuração do Nginx (DCCALOR principal + DCPET)..."
+    bash configurar_vm_principal.sh || true
 fi
 
 echo "===================================================="
 echo "   Deploy Concluído com Sucesso!                    "
-echo "   Endpoint: http://localhost:3000                  "
-echo "   Healthcheck: http://localhost:3000/api/health    "
+echo "   Endpoint Principal: http://172.31.3.60            "
+echo "   Subsistema DCPET:   http://172.31.3.60/dcpet/    "
+echo "   Healthcheck:        http://172.31.3.60/api/health"
 echo "===================================================="
