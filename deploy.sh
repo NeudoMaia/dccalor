@@ -32,13 +32,27 @@ fi
 if command -v docker &> /dev/null && command -v docker-compose &> /dev/null || docker compose version &> /dev/null; then
     echo "[2/4] Docker detectado. Construindo e subindo containers..."
     
+    # Desativar IPv6 no Kernel para forçar o Docker Daemon e o Go a utilizarem exclusivamente IPv4
+    echo "[*] Forçando resolução IPv4 no kernel Linux..."
+    sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1 || true
+    sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1 || true
+    
     # Priorizar IPv4 no sistema para evitar falha 'connection reset by peer' do Docker Hub via IPv6
     if [ -f /etc/gai.conf ]; then
         grep -q "precedence ::ffff:0:0/96  100" /etc/gai.conf || echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf 2>/dev/null || true
     fi
 
-    # Build aproveitando o cache da imagem base local
-    docker compose build
+    # Tentar build usando cache local primeiro (DOCKER_BUILDKIT=0 não consulta manifests remotos se a imagem base já existir)
+    echo "[*] Compilando imagem Docker..."
+    if DOCKER_BUILDKIT=0 docker compose build; then
+        echo "[✓] Build padrão concluído com sucesso!"
+    elif docker compose build; then
+        echo "[✓] Build com BuildKit concluído com sucesso!"
+    else
+        echo "[*] Tentando build direto via docker build..."
+        docker build -t dccalor-dccalor .
+    fi
+
     docker compose up -d
     echo "[3/4] Aguardando inicialização..."
     sleep 5
