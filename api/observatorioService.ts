@@ -546,6 +546,15 @@ export function obterDocumentacaoObservatorio() {
       responsavel: "Elineldo Pinheiro (Defesa Civil / SESEC)",
       email: "elineldo.pinheiro@sesec.fortaleza.ce.gov.br"
     },
+    autenticacao: {
+      tipo: "API Key (M2M)",
+      descricao: "Acesso restrito e controlado pela Defesa Civil de Fortaleza. Requer envio de chave de segurança válida.",
+      formas_de_envio: [
+        "Cabeçalho HTTP: 'x-api-key: SUA_CHAVE'",
+        "Cabeçalho HTTP: 'Authorization: Bearer SUA_CHAVE'",
+        "Query Parameter: '?api_key=SUA_CHAVE' (para testes no navegador)"
+      ]
+    },
     escala_niveis_alerta: [
       { nivel: "NIVEL_0", faixa: "≤ 27.0 °C", descricao: "Seguro / Rotina Normal" },
       { nivel: "NIVEL_1", faixa: "27.1 a 32.0 °C", descricao: "Atenção / Desconforto Leve (Recomenda-se hidratação)" },

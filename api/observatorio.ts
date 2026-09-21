@@ -45,11 +45,33 @@ export default async function handler(req: any, res: any) {
     const dataParam = query.data as string | undefined;
     const diasParam = query.dias ? parseInt(query.dias as string, 10) : undefined;
 
-    // Rota 1: Info / Documentação
+    // Rota 1: Info / Documentação (Pública para consulta de como integrar)
     if (url.includes('/info') || url.includes('/docs') || tipo === 'info' || tipo === 'docs') {
       res.status(200).json({
         sucesso: true,
         documentacao: obterDocumentacaoObservatorio()
+      });
+      return;
+    }
+
+    // Controle de Acesso Restrito / Autenticação (Defesa Civil -> IPPLAN)
+    const validApiKey = process.env.OBSERVATORIO_API_KEY || 'dccalor_ipplan_sec_2026';
+
+    const headerKey = req.headers?.['x-api-key'] || req.headers?.['X-API-KEY'];
+    const authHeader = req.headers?.['authorization'] || req.headers?.['Authorization'];
+    const bearerKey = authHeader && typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : null;
+    const queryKey = query.api_key || query.apiKey || query.key;
+
+    const providedKey = headerKey || bearerKey || queryKey;
+
+    if (!providedKey || providedKey !== validApiKey) {
+      res.status(401).json({
+        sucesso: false,
+        erro: "Acesso Não Autorizado",
+        mensagem: "Chave de autenticação ausente ou inválida. Os dados climáticos do DCCALOR são restritos ao IPPLAN e Defesa Civil. Forneça o cabeçalho 'x-api-key: SUA_CHAVE' ou o parâmetro '?api_key=SUA_CHAVE'.",
+        instrucao: "Consulte /api/observatorio/info para detalhes dos endpoints ou solicite a chave ao administrador da Defesa Civil."
       });
       return;
     }
