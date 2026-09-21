@@ -16,8 +16,13 @@ try {
     Write-Host ""
     Write-Host "[*] Conectando via SSH em $UserVM@$HostVM..." -ForegroundColor Yellow
     ssh -p $PortSSH -o StrictHostKeyChecking=no "$UserVM@$HostVM" $ComandoRemoto
-    Write-Host ""
-    Write-Host "[OK] Processo de Deploy finalizado com sucesso!" -ForegroundColor Green
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ""
+        Write-Host "[OK] Processo de Deploy finalizado com sucesso!" -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "[AVISO] O processo remoto finalizou com código $LASTEXITCODE." -ForegroundColor Red
+    }
 } catch {
     Write-Host ""
     Write-Host "[ERRO] Falha durante o deploy: $_" -ForegroundColor Red

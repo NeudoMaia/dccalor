@@ -31,8 +31,14 @@ fi
 # 3. Escolha do método de execução (Docker ou PM2/Nginx/Systemd)
 if command -v docker &> /dev/null && command -v docker-compose &> /dev/null || docker compose version &> /dev/null; then
     echo "[2/4] Docker detectado. Construindo e subindo containers..."
-    docker compose down || true
-    docker compose build --no-cache
+    
+    # Priorizar IPv4 no sistema para evitar falha 'connection reset by peer' do Docker Hub via IPv6
+    if [ -f /etc/gai.conf ]; then
+        grep -q "precedence ::ffff:0:0/96  100" /etc/gai.conf || echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf 2>/dev/null || true
+    fi
+
+    # Build aproveitando o cache da imagem base local
+    docker compose build
     docker compose up -d
     echo "[3/4] Aguardando inicialização..."
     sleep 5
