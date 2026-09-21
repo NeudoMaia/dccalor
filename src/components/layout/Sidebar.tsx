@@ -21,9 +21,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
-  const dcpetUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? '/dcpet/'
-    : 'http://172.31.3.60/dcpet/';
+  const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  const dcpetUrl = isVercel
+    ? 'https://dcpet-defesa-civil.vercel.app/'
+    : isLocal
+      ? 'http://172.31.3.60/dcpet/'
+      : '/dcpet/';
 
   const items = [
     { id: 'map', label: 'Monitoramento', icon: MapIcon, category: 'Dashboard' },

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import stationsHandler from './api/stations';
 import analyzeHandler from './api/analyze';
+import observatorioHandler from './api/observatorio';
 
 // Carregar variáveis de ambiente do .env
 dotenv.config();
@@ -47,6 +48,18 @@ app.all(['/api/analyze', '/dccalor/api/analyze'], async (req, res) => {
     console.error('Erro ao processar /api/analyze:', err);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Erro interno ao processar análise', details: err?.message });
+    }
+  }
+});
+
+// Rotas do Observatório Climático (Integração IPPLAN)
+app.all(['/api/observatorio', '/api/observatorio/*', '/dccalor/api/observatorio', '/dccalor/api/observatorio/*'], async (req, res) => {
+  try {
+    await observatorioHandler(req, res);
+  } catch (err: any) {
+    console.error('Erro ao processar /api/observatorio:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erro interno ao processar requisição do Observatório', details: err?.message });
     }
   }
 });
