@@ -22,10 +22,27 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rota de Healthcheck
 app.get(['/api/health', '/dccalor/api/health'], (req, res) => {
+  const agora = new Date();
+  const formatador = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Fortaleza',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'longOffset'
+  });
+  const partes = Object.fromEntries(formatador.formatToParts(agora).map(p => [p.type, p.value]));
+  const offset = partes.timeZoneName?.replace('GMT', '') || '-03:00';
+  const timestampGMT3 = `${partes.year}-${partes.month}-${partes.day}T${partes.hour}:${partes.minute}:${partes.second}${offset}`;
+
   res.status(200).json({
     status: 'online',
     system: 'DCCALOR - Monitoramento Térmico Fortaleza',
-    timestamp: new Date().toISOString()
+    qc_standard: 'INMET/OMM (Time of Measurement GMT-3)',
+    timestamp: timestampGMT3
   });
 });
 

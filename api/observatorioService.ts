@@ -699,7 +699,17 @@ export function obterDocumentacaoObservatorio() {
   return {
     sistema: "DCCALOR - Sistema de Monitoramento Térmico e Alerta da Defesa Civil de Fortaleza",
     cliente_integracao: "Observatório Climático de Fortaleza / IPPLAN",
-    versao_api: "v1.0",
+    versao_api: "v1.1 (QC INMET/OMM GMT-3)",
+    padrao_qualidade_qc: {
+      norma: "INMET / OMM (Controle de Qualidade Temporal e Termodinâmico)",
+      fuso_horario: "America/Fortaleza (GMT-3 estrito)",
+      timestamp_origem: "Time of Measurement intrínseco da estação (rejeita pacotes sem carimbo de origem)",
+      campos_auditoria_estacao: [
+        "data_hora_leitura (ISO-8601 GMT-3)",
+        "delta_t_segundos (Diferença exata entre medições consecutivas)",
+        "flag_qc_temporal ([SINCRONIZADO] | [PACOTE PERDIDO / ATRASO] | [COLISÃO / DADO DUPLICADO] | [CACHE_HIT / IGNORADO_NO_HISTORICO] | [REJEITADO_SEM_TIMESTAMP_ORIGEM])"
+      ]
+    },
     contatos_tecnicos: {
       responsavel: "Elineldo Pinheiro (Defesa Civil / SESEC)",
       email: "elineldo.pinheiro@sesec.fortaleza.ce.gov.br"
