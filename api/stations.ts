@@ -15,6 +15,150 @@ interface StationData {
   secondaryAreas: string[];
   isIoT?: boolean;
   isReference?: boolean;
+  measurementTimestamp?: string;
+  deltaTSeconds?: number | null;
+  qcTemporalFlag?: string;
+}
+
+// Memória de deduplicação de polling por estação (impede duplicatas de 30s / 180s)
+const ultimoTimestampIntrinsecoPorEstacao: Record<string, number> = {};
+
+/**
+ * Converte qualquer data/timestamp para o fuso estrito America/Fortaleza (GMT-3)
+ * e extrai a hora local (0-23) imune ao relógio UTC do container.
+ */
+function extrairTempoFortalezaGMT3(rawInput?: string | number | Date): {
+  isoGMT3: string;
+  epochMs: number;
+  horaLocalFortaleza: number;
+  fusoValidoGMT3: boolean;
+} {
+  const parsed = rawInput !== undefined && rawInput !== null ? new Date(rawInput) : new Date();
+  const dataValida = isNaN(parsed.getTime()) ? new Date() : parsed;
+  const epochMs = dataValida.getTime();
+
+  const formatador = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Fortaleza',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'longOffset'
+  });
+
+  const partes = formatador.formatToParts(dataValida);
+  const mapa = Object.fromEntries(partes.map(p => [p.type, p.value]));
+  const offset = mapa.timeZoneName?.replace('GMT', '') || '-03:00';
+  const fusoValidoGMT3 = offset === '-03:00';
+  const isoGMT3 = `${mapa.year}-${mapa.month}-${mapMonthOrDay(mapa.day)}T${mapa.hour}:${mapa.minute}:${mapa.second}${offset}`;
+  const horaLocalFortaleza = parseInt(mapa.hour, 10);
+
+  return { isoGMT3, epochMs, horaLocalFortaleza, fusoValidoGMT3 };
+}
+
+function mapMonthOrDay(val: string): string {
+  return val.padStart(2, '0');
+}
+
+/**
+ * Audita o Time of Measurement intrínseco do pacote IoT da Plugfield e impede duplicatas de polling.
+ */
+function auditarPacoteIoTPlugfield(stationId: string, rawMeasurementTime?: string | number): {
+  timestampFortalezaISO: string;
+  horaLocalFortaleza: number;
+  deltaTSegundos: number | null;
+  flagTemporal:
+    | '[REJEITADO_SEM_TIMESTAMP_ORIGEM]'
+    | '[CACHE_HIT / IGNORADO_NO_HISTORICO]'
+    | '[SINCRONIZADO]'
+    | '[PACOTE PERDIDO / ATRASO]'
+    | '[COLISÃO / DADO DUPLICADO]'
+    | '[LEITURA INICIAL]';
+  ignorarNoHistorico: boolean;
+} {
+  // Validação estrita: rejeita pacotes sem carimbo de tempo de origem válido (proibido fallback silencioso para new Date())
+  const timestampOrigemInvalido =
+    rawMeasurementTime === undefined ||
+    rawMeasurementTime === null ||
+    (typeof rawMeasurementTime === 'string' && rawMeasurementTime.trim() === '') ||
+    isNaN(new Date(rawMeasurementTime).getTime());
+
+  if (timestampOrigemInvalido) {
+    const { isoGMT3, horaLocalFortaleza } = extrairTempoFortalezaGMT3();
+    console.warn(
+      `[QC-TELEMETRIA] Estação=${stationId} | TS_ORIGEM=AUSENTE/INVÁLIDO | Status=[REJEITADO_SEM_TIMESTAMP_ORIGEM]`
+    );
+    return {
+      timestampFortalezaISO: isoGMT3,
+      horaLocalFortaleza,
+      deltaTSegundos: null,
+      flagTemporal: '[REJEITADO_SEM_TIMESTAMP_ORIGEM]',
+      ignorarNoHistorico: true
+    };
+  }
+
+  const { isoGMT3, epochMs, horaLocalFortaleza, fusoValidoGMT3 } = extrairTempoFortalezaGMT3(rawMeasurementTime);
+
+  if (!fusoValidoGMT3) {
+    console.warn(`[QC-TIMEZONE-ALERTA] Estação ${stationId} fora de GMT-3 (America/Fortaleza)`);
+  }
+
+  const ultimoEpochMs = ultimoTimestampIntrinsecoPorEstacao[stationId];
+
+  // Se o Time of Measurement intrínseco do pacote for idêntico ao último processado na memória:
+  if (ultimoEpochMs !== undefined && epochMs === ultimoEpochMs) {
+    console.info(
+      `[QC-TELEMETRIA] Estação=${stationId} | TS_GMT3=${isoGMT3} | DeltaT=0s | Status=[CACHE_HIT / IGNORADO_NO_HISTORICO]`
+    );
+    return {
+      timestampFortalezaISO: isoGMT3,
+      horaLocalFortaleza,
+      deltaTSegundos: 0,
+      flagTemporal: '[CACHE_HIT / IGNORADO_NO_HISTORICO]',
+      ignorarNoHistorico: true
+    };
+  }
+
+  ultimoTimestampIntrinsecoPorEstacao[stationId] = epochMs;
+
+  if (ultimoEpochMs === undefined) {
+    console.info(
+      `[QC-TELEMETRIA] Estação=${stationId} | TS_GMT3=${isoGMT3} | DeltaT=N/A | Status=[LEITURA INICIAL]`
+    );
+    return {
+      timestampFortalezaISO: isoGMT3,
+      horaLocalFortaleza,
+      deltaTSegundos: null,
+      flagTemporal: '[LEITURA INICIAL]',
+      ignorarNoHistorico: false
+    };
+  }
+
+  const deltaTSegundos = Number(((epochMs - ultimoEpochMs) / 1000).toFixed(3));
+  let flagTemporal: '[SINCRONIZADO]' | '[PACOTE PERDIDO / ATRASO]' | '[COLISÃO / DADO DUPLICADO]';
+
+  if (deltaTSegundos >= 595 && deltaTSegundos <= 605) {
+    flagTemporal = '[SINCRONIZADO]';
+  } else if (deltaTSegundos > 605) {
+    flagTemporal = '[PACOTE PERDIDO / ATRASO]';
+  } else {
+    flagTemporal = '[COLISÃO / DADO DUPLICADO]';
+  }
+
+  console.info(
+    `[QC-TELEMETRIA] Estação=${stationId} | TS_GMT3=${isoGMT3} | DeltaT=${deltaTSegundos}s | Status=${flagTemporal}`
+  );
+
+  return {
+    timestampFortalezaISO: isoGMT3,
+    horaLocalFortaleza,
+    deltaTSegundos,
+    flagTemporal,
+    ignorarNoHistorico: false
+  };
 }
 
 // 1. Static Neighborhood mappings for the 11 Defesa Civil weather stations
@@ -192,8 +336,9 @@ export default async function handler(req: any, res: any) {
       minTempId = 9169; // Messejana como fallback de segurança
     }
 
-    // D. Mapear e Processar
+    // D. Mapear e Processar com Auditoria de Time of Measurement (GMT-3)
     const processedStations: StationData[] = [];
+    let latestMeasurementISO = extrairTempoFortalezaGMT3().isoGMT3;
 
     for (const dev of rawDevices) {
       const mapping = STATION_MAPPINGS[dev.id];
@@ -201,14 +346,29 @@ export default async function handler(req: any, res: any) {
         continue;
       }
 
+      // Captura estrita do Time of Measurement intrínseco do payload da Plugfield
+      const rawMeasurementTime = dev.dashboard?.time ?? dev.lastCommunication ?? dev.updatedAt;
+      const auditoriaTemporal = auditarPacoteIoTPlugfield(dev.id.toString(), rawMeasurementTime);
+      latestMeasurementISO = auditoriaTemporal.timestampFortalezaISO;
+      const horaFortaleza = auditoriaTemporal.horaLocalFortaleza;
+
       let temp = dev.dashboard?.temp ?? 28.0;
       let humidity = dev.dashboard?.humi ?? 70;
 
-      // Vento e Radiação do Plugfield (fallback para simulado se não existir)
-      let windSpeed = dev.dashboard?.windSpeed ?? parseFloat((2.0 + Math.sin(dev.id) * 1.5).toFixed(1));
-      let solarRadiation = dev.dashboard?.solarRadiation ?? 
-        (new Date().getHours() >= 6 && new Date().getHours() <= 17 
-          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (new Date().getHours() - 6) / 11)))
+      // Vento e Radiação do Plugfield (com modelagem biofísica e fotométrica)
+      let windSpeed = dev.dashboard?.windSpeed ?? 
+        (typeof dev.dashboard?.wind === 'number' ? parseFloat((dev.dashboard.wind / 3.6).toFixed(1)) : parseFloat((2.0 + Math.sin(dev.id) * 1.5).toFixed(1)));
+
+      /**
+       * MODELAGEM METEOROLÓGICA DA RADIAÇÃO SOLAR GLOBAL (W/m²):
+       * Fallback astronômico operando estritamente em America/Fortaleza (GMT-3).
+       */
+      let solarRadiation = dev.dashboard?.radiation ?? 
+        dev.dashboard?.solarRadiation ?? 
+        (typeof dev.dashboard?.uv === 'number' ? parseFloat((dev.dashboard.uv * 100).toFixed(1)) : undefined) ??
+        (typeof dev.dashboard?.radi === 'number' ? parseFloat((dev.dashboard.radi / 126.58).toFixed(1)) : undefined) ??
+        (horaFortaleza >= 6 && horaFortaleza <= 17 
+          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (horaFortaleza - 6) / 11)))
           : 0);
           
       // [Módulo de Integridade]: Validação de Dados (QC)
@@ -240,7 +400,10 @@ export default async function handler(req: any, res: any) {
         status: isSpurious ? 'OFFLINE' : computeStatus(idt),
         primaryArea: mapping.primaryArea,
         secondaryAreas: mapping.secondaryAreas,
-        isReference: isRef
+        isReference: isRef,
+        measurementTimestamp: auditoriaTemporal.timestampFortalezaISO,
+        deltaTSeconds: auditoriaTemporal.deltaTSegundos,
+        qcTemporalFlag: auditoriaTemporal.flagTemporal
       });
     }
 
@@ -253,25 +416,25 @@ export default async function handler(req: any, res: any) {
     res.status(200).json({
       success: true,
       source: "live_api",
-      timestamp: new Date().toISOString(),
+      timestamp: latestMeasurementISO,
       stations: processedStations
     });
 
   } catch (error: any) {
     console.error("Plugfield API integration error, serving simulated fallback:", error);
+    const { isoGMT3: timestampFallbackGMT3, horaLocalFortaleza: hourFortaleza, epochMs } = extrairTempoFortalezaGMT3();
     
-    // Fallback de Resiliência: Simulação Física com Referência Térmica Dinâmica
+    // Fallback de Resiliência: Simulação Física com Referência Térmica Dinâmica em GMT-3
     const simulatedStations = Object.entries(STATION_MAPPINGS).map(([idStr, mapping]) => {
       const id = parseInt(idStr);
       const baseline = STATION_BASELINES[id] ?? 29.0;
       
       const hashVal = id % 10;
-      const temp = parseFloat((baseline + (Math.sin(Date.now() / 100000 + hashVal) * 1.5)).toFixed(1));
-      const humidity = Math.max(30, Math.min(95, Math.round(65 + (Math.cos(Date.now() / 100000 + hashVal) * 10))));
-      const windSpeed = parseFloat((2.5 + Math.sin(Date.now() / 50000 + hashVal) * 1.5).toFixed(1));
-      const hour = new Date().getHours();
-      const solarRadiation = hour >= 6 && hour <= 17 
-          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (hour - 6) / 11)))
+      const temp = parseFloat((baseline + (Math.sin(epochMs / 100000 + hashVal) * 1.5)).toFixed(1));
+      const humidity = Math.max(30, Math.min(95, Math.round(65 + (Math.cos(epochMs / 100000 + hashVal) * 10))));
+      const windSpeed = parseFloat((2.5 + Math.sin(epochMs / 50000 + hashVal) * 1.5).toFixed(1));
+      const solarRadiation = hourFortaleza >= 6 && hourFortaleza <= 17 
+          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (hourFortaleza - 6) / 11)))
           : 0;
       
       return {
@@ -289,7 +452,10 @@ export default async function handler(req: any, res: any) {
         status: computeStatus(computeIDT(temp, humidity, windSpeed, solarRadiation)),
         primaryArea: mapping.primaryArea,
         secondaryAreas: mapping.secondaryAreas,
-        isReference: false
+        isReference: false,
+        measurementTimestamp: timestampFallbackGMT3,
+        deltaTSeconds: null,
+        qcTemporalFlag: '[FALLBACK_SIMULADO_GMT3]'
       };
     });
 
@@ -326,7 +492,7 @@ export default async function handler(req: any, res: any) {
       success: true,
       source: "simulated_fallback",
       error: error.message || "Unknown error",
-      timestamp: new Date().toISOString(),
+      timestamp: timestampFallbackGMT3,
       stations: finalSimulated
     });
   }

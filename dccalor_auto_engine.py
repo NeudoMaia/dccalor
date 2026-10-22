@@ -1,4 +1,4 @@
-﻿"""
+"""
 Motor Autônomo e Pipeline Integrado do DCCALOR
 """
 import os
@@ -22,24 +22,76 @@ class DCCALOREngine:
         self.preditor = PreditorHibrido()
 
     def processar_e_enriquecer(self, df: pd.DataFrame, col_temp: str = "temperatura", col_umid: str = "umidade") -> pd.DataFrame:
-        """Aplica psicrometria completa e variáveis dinâmicas."""
+        """Aplica QC oficial INMET/OMM na grade de 15 min, psicrometria completa e variáveis dinâmicas."""
         df = df.copy()
+
+        # 1. Fixação estrita de Fuso Horário em America/Fortaleza (GMT-3) e Deduplicação de Timestamp
         if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
-            df = df.sort_values(by="timestamp").drop_duplicates(subset=["timestamp"]).set_index("timestamp")
-        
-        # Filtros de sanidade física
-        df[col_temp] = df[col_temp].clip(lower=-10.0, upper=55.0)
-        df[col_umid] = df[col_umid].clip(lower=2.0, upper=100.0)
-        df = df.interpolate(method="time").ffill().bfill()
+            if df["timestamp"].dt.tz is None:
+                df["timestamp"] = df["timestamp"].dt.tz_localize("America/Fortaleza")
+            else:
+                df["timestamp"] = df["timestamp"].dt.tz_convert("America/Fortaleza")
+            df = df.sort_values(by="timestamp").drop_duplicates(subset=["timestamp"], keep="last").set_index("timestamp")
+        elif isinstance(df.index, pd.DatetimeIndex):
+            if df.index.tz is None:
+                df.index = df.index.tz_localize("America/Fortaleza")
+            else:
+                df.index = df.index.tz_convert("America/Fortaleza")
+            df = df.sort_index()
+            df = df[~df.index.duplicated(keep="last")]
 
-        # Psicrometria
+        # PASSO A: Range Test Bruto ANTES do Resample (impede contaminação da média de 15 min por outliers)
+        fora_range_bruto = (
+            (df[col_temp] < 15.0) | (df[col_temp] > 45.0) |
+            (df[col_umid] <= 0.0) | (df[col_umid] > 100.0)
+        )
+        df.loc[fora_range_bruto, [col_temp, col_umid]] = np.nan
+
+        # PASSO B: Resample Seguro na Grade Padronizada de 15 Minutos (evita TypeError com colunas string)
+        df = df.resample("15min").mean(numeric_only=True)
+
+        # PASSO C: Interpolação Limpa (restrita a lacunas curtas de no máximo 2 passos = 30 min)
+        df[[col_temp, col_umid]] = df[[col_temp, col_umid]].interpolate(method="time", limit=2)
+
+        # PASSO D: Step Test e Consistência Interna na Grade de 15 min
+        rejeitado_range_Ou_ausente = (
+            df[col_temp].isna() | df[col_umid].isna() |
+            (df[col_temp] < 15.0) | (df[col_temp] > 45.0) |
+            (df[col_umid] <= 0.0) | (df[col_umid] > 100.0)
+        )
+
+        # Calcula t_orvalho_preliminar APENAS onde temperatura e umidade não sejam NaN
+        mask_validos = df[col_temp].notna() & df[col_umid].notna()
+        t_orvalho_preliminar = pd.Series(np.nan, index=df.index, dtype=float)
+        if mask_validos.any():
+            t_orvalho_preliminar.loc[mask_validos] = self.psicro.ponto_orvalho(
+                df.loc[mask_validos, col_temp].values,
+                df.loc[mask_validos, col_umid].values
+            )
+        rejeitado_consistencia = mask_validos & (t_orvalho_preliminar > df[col_temp])
+
+        # Step Test na grade de 15 min
+        suspeito_step = (
+            (df[col_temp].diff().abs() > 3.0) |
+            (df[col_umid].diff().abs() > 25.0)
+        )
+
+        # Consolidação hierárquica em `qc_flag_inmet` (0 = Aprovado, 1 = Suspeito, 2 = Rejeitado/Ausente)
+        df["qc_flag_inmet"] = 0
+        df.loc[suspeito_step, "qc_flag_inmet"] = 1
+        df.loc[rejeitado_range_Ou_ausente | rejeitado_consistencia, "qc_flag_inmet"] = 2
+
+        # Expurgo garantido de registros Rejeitados (qc_flag_inmet == 2) antes de chamar self.psicro
+        df.loc[df["qc_flag_inmet"] == 2, [col_temp, col_umid]] = np.nan
+
+        # Psicrometria (NÚCLEO FÍSICO INTACTO)
         df["entalpia_kj_kg"] = self.psicro.entalpia_especifica(df[col_temp].values, df[col_umid].values)
         df["umidade_absoluta"] = self.psicro.umidade_absoluta(df[col_temp].values, df[col_umid].values)
         df["vpd_kpa"] = self.psicro.deficit_pressao_vapor(df[col_temp].values, df[col_umid].values)
         df["ponto_orvalho_c"] = self.psicro.ponto_orvalho(df[col_temp].values, df[col_umid].values)
 
-        # Harmônicos sazonais
+        # Harmônicos sazonais (NÚCLEO FÍSICO INTACTO - agora estritamente em GMT-3)
         hora = df.index.hour + df.index.minute / 60.0
         dia = df.index.dayofyear
         df["fourier_dia_sin"] = np.sin(2 * np.pi * hora / 24.0)
@@ -47,7 +99,7 @@ class DCCALOREngine:
         df["fourier_ano_sin"] = np.sin(2 * np.pi * dia / 365.25)
         df["fourier_ano_cos"] = np.cos(2 * np.pi * dia / 365.25)
 
-        # Lags temporais
+        # Lags temporais (NÚCLEO FÍSICO INTACTO - agora garantidos sobre passos exatos de 15 min)
         for lag in [1, 2, 4]:
             df[f"temp_lag_{lag}"] = df[col_temp].shift(lag)
             df[f"entalpia_lag_{lag}"] = df["entalpia_kj_kg"].shift(lag)

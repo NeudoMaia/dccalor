@@ -20,6 +20,8 @@ export interface EstacaoAtual {
   descricao_nivel: string;
   data_hora_leitura: string;
   is_referencia_termica: boolean;
+  delta_t_segundos?: number | null;
+  flag_qc_temporal?: string;
 }
 
 export interface ValorDiario {
@@ -58,6 +60,134 @@ export interface EstacaoPredicao {
   longitude: number;
   bairro_principal: string;
   predicoes: PredicaoDiariaPonto[];
+}
+
+// Memória de deduplicação do Time of Measurement intrínseco por estação
+const ultimoTimestampIntrinsecoObservatorio: Record<string, number> = {};
+
+/**
+ * Converte e valida explicitamente qualquer timestamp para o fuso America/Fortaleza (GMT-3),
+ * retornando a string ISO com offset -03:00 e a hora local (0-23) imune ao relógio UTC do container.
+ */
+export function extrairTempoFortalezaGMT3(rawInput?: string | number | Date): {
+  isoGMT3: string;
+  dataYYYYMMDD: string;
+  epochMs: number;
+  horaLocalFortaleza: number;
+  fusoValidoGMT3: boolean;
+} {
+  const parsed = rawInput !== undefined && rawInput !== null ? new Date(rawInput) : new Date();
+  const dataValida = isNaN(parsed.getTime()) ? new Date() : parsed;
+  const epochMs = dataValida.getTime();
+
+  const formatador = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Fortaleza',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'longOffset'
+  });
+
+  const partes = formatador.formatToParts(dataValida);
+  const mapa = Object.fromEntries(partes.map(p => [p.type, p.value]));
+  const offset = mapa.timeZoneName?.replace('GMT', '') || '-03:00';
+  const fusoValidoGMT3 = offset === '-03:00';
+  const dataYYYYMMDD = `${mapa.year}-${mapa.month}-${mapa.day}`;
+  const isoGMT3 = `${dataYYYYMMDD}T${mapa.hour}:${mapa.minute}:${mapa.second}${offset}`;
+  const horaLocalFortaleza = parseInt(mapa.hour, 10);
+
+  return { isoGMT3, dataYYYYMMDD, epochMs, horaLocalFortaleza, fusoValidoGMT3 };
+}
+
+/**
+ * Audita a cadência do Time of Measurement intrínseco da estação e impede duplicatas de polling/cache.
+ */
+function auditarMeasurementObservatorio(stationId: string, rawMeasurementTime?: string | number): {
+  timestampFortalezaISO: string;
+  horaLocalFortaleza: number;
+  deltaTSegundos: number | null;
+  flagTemporal:
+    | '[REJEITADO_SEM_TIMESTAMP_ORIGEM]'
+    | '[CACHE_HIT / IGNORADO_NO_HISTORICO]'
+    | '[SINCRONIZADO]'
+    | '[PACOTE PERDIDO / ATRASO]'
+    | '[COLISÃO / DADO DUPLICADO]'
+    | '[LEITURA INICIAL]';
+  ignorarNoHistorico: boolean;
+} {
+  // Validação estrita: rejeita pacotes sem carimbo de tempo de origem válido (proibido fallback silencioso para new Date())
+  const timestampOrigemInvalido =
+    rawMeasurementTime === undefined ||
+    rawMeasurementTime === null ||
+    (typeof rawMeasurementTime === 'string' && rawMeasurementTime.trim() === '') ||
+    isNaN(new Date(rawMeasurementTime).getTime());
+
+  if (timestampOrigemInvalido) {
+    const { isoGMT3, horaLocalFortaleza } = extrairTempoFortalezaGMT3();
+    console.warn(
+      `[QC-TELEMETRIA] Estação=${stationId} | TS_ORIGEM=AUSENTE/INVÁLIDO | Status=[REJEITADO_SEM_TIMESTAMP_ORIGEM]`
+    );
+    return {
+      timestampFortalezaISO: isoGMT3,
+      horaLocalFortaleza,
+      deltaTSegundos: null,
+      flagTemporal: '[REJEITADO_SEM_TIMESTAMP_ORIGEM]',
+      ignorarNoHistorico: true
+    };
+  }
+
+  const { isoGMT3, epochMs, horaLocalFortaleza, fusoValidoGMT3 } = extrairTempoFortalezaGMT3(rawMeasurementTime);
+
+  if (!fusoValidoGMT3) {
+    console.warn(`[QC-TIMEZONE-ALERTA] Estação ${stationId} fora de GMT-3 (America/Fortaleza)`);
+  }
+
+  const ultimoEpochMs = ultimoTimestampIntrinsecoObservatorio[stationId];
+
+  if (ultimoEpochMs !== undefined && epochMs === ultimoEpochMs) {
+    return {
+      timestampFortalezaISO: isoGMT3,
+      horaLocalFortaleza,
+      deltaTSegundos: 0,
+      flagTemporal: '[CACHE_HIT / IGNORADO_NO_HISTORICO]',
+      ignorarNoHistorico: true
+    };
+  }
+
+  ultimoTimestampIntrinsecoObservatorio[stationId] = epochMs;
+
+  if (ultimoEpochMs === undefined) {
+    return {
+      timestampFortalezaISO: isoGMT3,
+      horaLocalFortaleza,
+      deltaTSegundos: null,
+      flagTemporal: '[LEITURA INICIAL]',
+      ignorarNoHistorico: false
+    };
+  }
+
+  const deltaTSegundos = Number(((epochMs - ultimoEpochMs) / 1000).toFixed(3));
+  let flagTemporal: '[SINCRONIZADO]' | '[PACOTE PERDIDO / ATRASO]' | '[COLISÃO / DADO DUPLICADO]';
+
+  if (deltaTSegundos >= 595 && deltaTSegundos <= 605) {
+    flagTemporal = '[SINCRONIZADO]';
+  } else if (deltaTSegundos > 605) {
+    flagTemporal = '[PACOTE PERDIDO / ATRASO]';
+  } else {
+    flagTemporal = '[COLISÃO / DADO DUPLICADO]';
+  }
+
+  return {
+    timestampFortalezaISO: isoGMT3,
+    horaLocalFortaleza,
+    deltaTSegundos,
+    flagTemporal,
+    ignorarNoHistorico: false
+  };
 }
 
 // 1. Mapeamento estático oficial das 11 estações da Defesa Civil de Fortaleza
@@ -179,7 +309,7 @@ export function classificarNivelAlerta(sensacaoTermica: number): { nivel: 'NIVEL
 }
 
 // 3. Cache de Estações em Memória (TTL: 3 minutos)
-let estacoesCache: { timestamp: number; data: EstacaoAtual[] } | null = null;
+let estacoesCache: { timestamp: number; timestampGMT3: string; data: EstacaoAtual[] } | null = null;
 const CACHE_TTL_MS = 3 * 60 * 1000;
 
 const DEFAULT_USERNAME = "elineldo.pinheiro@sesec.fortaleza.ce.gov.br";
@@ -190,11 +320,17 @@ const DEFAULT_API_KEY = "4pHePHZPCk4i8Ckz8qCsZ3YPDgQFeuf68IZelpRk";
  * Busca ou gera os dados mais atuais das estações meteorológicas de Fortaleza
  */
 export async function obterEstacoesAtuais(): Promise<{ estacoes: EstacaoAtual[]; timestamp: string; fonte: string }> {
-  const agora = Date.now();
+  const { epochMs: agora, isoGMT3: agoraGMT3, horaLocalFortaleza: horaFortalezaAtual } = extrairTempoFortalezaGMT3();
+
   if (estacoesCache && (agora - estacoesCache.timestamp < CACHE_TTL_MS)) {
+    const estacoesMarcadasCache = estacoesCache.data.map(est => ({
+      ...est,
+      delta_t_segundos: 0,
+      flag_qc_temporal: '[CACHE_HIT / IGNORADO_NO_HISTORICO]'
+    }));
     return {
-      estacoes: estacoesCache.data,
-      timestamp: new Date(estacoesCache.timestamp).toISOString(),
+      estacoes: estacoesMarcadasCache,
+      timestamp: estacoesCache.timestampGMT3,
       fonte: 'cache_dccalor'
     };
   }
@@ -247,17 +383,33 @@ export async function obterEstacoesAtuais(): Promise<{ estacoes: EstacaoAtual[];
     }
 
     const estacoesProcessadas: EstacaoAtual[] = [];
+    let ultimoTimestampMedicaoGlobal = agoraGMT3;
 
     for (const dev of rawDevices) {
       const mapping = ESTACOES_MAPPING[dev.id];
       if (!mapping) continue;
 
+      // Extração estrita do Time of Measurement intrínseco do pacote da Plugfield
+      const rawMeasurementTime = dev.dashboard?.time ?? dev.lastCommunication ?? dev.updatedAt;
+      const qcTemporal = auditarMeasurementObservatorio(dev.id.toString(), rawMeasurementTime);
+      ultimoTimestampMedicaoGlobal = qcTemporal.timestampFortalezaISO;
+      const horaFortaleza = qcTemporal.horaLocalFortaleza;
+
       let temp = dev.dashboard?.temp ?? 28.0;
       let humidity = dev.dashboard?.humi ?? 70;
-      let windSpeed = dev.dashboard?.windSpeed ?? parseFloat((2.0 + Math.sin(dev.id) * 1.5).toFixed(1));
-      let solarRadiation = dev.dashboard?.solarRadiation ?? 
-        (new Date().getHours() >= 6 && new Date().getHours() <= 17 
-          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (new Date().getHours() - 6) / 11)))
+      let windSpeed = dev.dashboard?.windSpeed ?? 
+        (typeof dev.dashboard?.wind === 'number' ? parseFloat((dev.dashboard.wind / 3.6).toFixed(1)) : parseFloat((2.0 + Math.sin(dev.id) * 1.5).toFixed(1)));
+
+      /**
+       * MODELAGEM METEOROLÓGICA DA RADIAÇÃO SOLAR GLOBAL (W/m²):
+       * Opera estritamente sob a hora local de Fortaleza (GMT-3), imune ao fuso UTC do container.
+       */
+      let solarRadiation = dev.dashboard?.radiation ?? 
+        dev.dashboard?.solarRadiation ?? 
+        (typeof dev.dashboard?.uv === 'number' ? parseFloat((dev.dashboard.uv * 100).toFixed(1)) : undefined) ??
+        (typeof dev.dashboard?.radi === 'number' ? parseFloat((dev.dashboard.radi / 126.58).toFixed(1)) : undefined) ??
+        (horaFortaleza >= 6 && horaFortaleza <= 17 
+          ? Math.max(100, Math.min(1000, 800 * Math.sin(Math.PI * (horaFortaleza - 6) / 11)))
           : 0);
 
       // Controle de Qualidade (QC)
@@ -287,26 +439,28 @@ export async function obterEstacoesAtuais(): Promise<{ estacoes: EstacaoAtual[];
         anomalia_termica: anomalia,
         nivel_alerta: statusAlerta.nivel,
         descricao_nivel: statusAlerta.descricao,
-        data_hora_leitura: new Date().toISOString(),
-        is_referencia_termica: dev.id === minTempId
+        data_hora_leitura: qcTemporal.timestampFortalezaISO,
+        is_referencia_termica: dev.id === minTempId,
+        delta_t_segundos: qcTemporal.deltaTSegundos,
+        flag_qc_temporal: qcTemporal.flagTemporal
       });
     }
 
     // Ordenar do maior para o menor desconforto térmico
     estacoesProcessadas.sort((a, b) => b.sensacao_termica - a.sensacao_termica);
 
-    estacoesCache = { timestamp: agora, data: estacoesProcessadas };
+    estacoesCache = { timestamp: agora, timestampGMT3: ultimoTimestampMedicaoGlobal, data: estacoesProcessadas };
     return {
       estacoes: estacoesProcessadas,
-      timestamp: new Date(agora).toISOString(),
+      timestamp: ultimoTimestampMedicaoGlobal,
       fonte: 'live_plugfield_api'
     };
 
   } catch (err: any) {
     console.warn("[Observatório DCCALOR] Fallback para modelagem física calibrada:", err?.message || err);
 
-    // Fallback calibrado
-    const hora = new Date().getHours();
+    // Fallback calibrado operando estritamente em America/Fortaleza (GMT-3)
+    const hora = horaFortalezaAtual;
     const estacoesSimuladas: EstacaoAtual[] = Object.entries(ESTACOES_MAPPING).map(([idStr, mapping]) => {
       const id = parseInt(idStr);
       const hash = id % 10;
@@ -334,17 +488,19 @@ export async function obterEstacoesAtuais(): Promise<{ estacoes: EstacaoAtual[];
         anomalia_termica: parseFloat((temp - base).toFixed(2)),
         nivel_alerta: alerta.nivel,
         descricao_nivel: alerta.descricao,
-        data_hora_leitura: new Date(agora).toISOString(),
-        is_referencia_termica: id === 9169
+        data_hora_leitura: agoraGMT3,
+        is_referencia_termica: id === 9169,
+        delta_t_segundos: null,
+        flag_qc_temporal: '[FALLBACK_SIMULADO_GMT3]'
       };
     });
 
     estacoesSimuladas.sort((a, b) => b.sensacao_termica - a.sensacao_termica);
-    estacoesCache = { timestamp: agora, data: estacoesSimuladas };
+    estacoesCache = { timestamp: agora, timestampGMT3: agoraGMT3, data: estacoesSimuladas };
 
     return {
       estacoes: estacoesSimuladas,
-      timestamp: new Date(agora).toISOString(),
+      timestamp: agoraGMT3,
       fonte: 'modelo_fisico_calibrado_dccalor'
     };
   }
@@ -352,7 +508,7 @@ export async function obterEstacoesAtuais(): Promise<{ estacoes: EstacaoAtual[];
 
 /**
  * 2. Gera a série histórica diária de sensação térmica por estação
- * @param dataReferencia Data base (ISO YYYY-MM-DD). Se não fornecida, usa a data atual.
+ * @param dataReferencia Data base (ISO YYYY-MM-DD). Se não fornecida, usa a data atual em GMT-3.
  * @param dias Quantidade de dias passados para retornar (padrão: 30 dias).
  */
 export async function obterSensacaoDiaria(dataReferencia?: string, dias: number = 30): Promise<{
@@ -363,9 +519,10 @@ export async function obterSensacaoDiaria(dataReferencia?: string, dias: number 
 }> {
   const { estacoes } = await obterEstacoesAtuais();
   
-  // Garantir limites sadios para o parâmetro dias
+  // Garantir limites sadios para o parâmetro dias e fuso America/Fortaleza (GMT-3)
   const totalDias = Math.min(365, Math.max(1, dias));
-  const baseDate = dataReferencia ? new Date(dataReferencia + "T12:00:00Z") : new Date();
+  const dataRefGMT3 = dataReferencia || extrairTempoFortalezaGMT3().dataYYYYMMDD;
+  const baseDate = new Date(`${dataRefGMT3}T12:00:00-03:00`);
   if (isNaN(baseDate.getTime())) {
     throw new Error(`Data inválida fornecida: '${dataReferencia}'. Utilize o formato YYYY-MM-DD.`);
   }
@@ -386,7 +543,7 @@ export async function obterSensacaoDiaria(dataReferencia?: string, dias: number 
     for (let i = totalDias - 1; i >= 0; i--) {
       const d = new Date(baseDate);
       d.setDate(baseDate.getDate() - i);
-      const isoDate = d.toISOString().split('T')[0];
+      const isoDate = extrairTempoFortalezaGMT3(d).dataYYYYMMDD;
       const dayOfYear = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
 
       // Variação harmônica sazonal e ruído estacionário
@@ -440,7 +597,7 @@ export async function obterSensacaoDiaria(dataReferencia?: string, dias: number 
   });
 
   return {
-    data_referencia: baseDate.toISOString().split('T')[0],
+    data_referencia: extrairTempoFortalezaGMT3(baseDate).dataYYYYMMDD,
     dias_solicitados: totalDias,
     total_estacoes: estacoesDiarias.length,
     estacoes: estacoesDiarias
@@ -449,7 +606,7 @@ export async function obterSensacaoDiaria(dataReferencia?: string, dias: number 
 
 /**
  * 3. Gera a predição diária de sensação térmica por estação (Holt's Double Exponential Smoothing)
- * @param dataReferencia Data de início da predição (ISO YYYY-MM-DD). Se não fornecida, usa hoje.
+ * @param dataReferencia Data de início da predição (ISO YYYY-MM-DD). Se não fornecida, usa hoje em GMT-3.
  * @param diasHorizonte Quantidade de dias futuros para prever (padrão: 7 dias).
  */
 export async function obterPredicaoDiaria(dataReferencia?: string, diasHorizonte: number = 7): Promise<{
@@ -460,13 +617,14 @@ export async function obterPredicaoDiaria(dataReferencia?: string, diasHorizonte
   estacoes: EstacaoPredicao[];
 }> {
   const horizonte = Math.min(30, Math.max(1, diasHorizonte));
-  const baseDate = dataReferencia ? new Date(dataReferencia + "T12:00:00Z") : new Date();
+  const dataRefGMT3 = dataReferencia || extrairTempoFortalezaGMT3().dataYYYYMMDD;
+  const baseDate = new Date(`${dataRefGMT3}T12:00:00-03:00`);
   if (isNaN(baseDate.getTime())) {
     throw new Error(`Data inválida fornecida: '${dataReferencia}'. Utilize o formato YYYY-MM-DD.`);
   }
 
   // Primeiro obtemos o histórico recente (14 dias) para calibrar os parâmetros de Holt
-  const historico = await obterSensacaoDiaria(baseDate.toISOString().split('T')[0], 14);
+  const historico = await obterSensacaoDiaria(extrairTempoFortalezaGMT3(baseDate).dataYYYYMMDD, 14);
 
   const estacoesPredicao: EstacaoPredicao[] = historico.estacoes.map(estacao => {
     const serieIdt = estacao.valores_diarios.map(v => v.sensacao_termica_media);
@@ -507,7 +665,7 @@ export async function obterPredicaoDiaria(dataReferencia?: string, diasHorizonte
       const alerta = classificarNivelAlerta(idtPrevisto);
 
       predicoes.push({
-        data: projDate.toISOString().split('T')[0],
+        data: extrairTempoFortalezaGMT3(projDate).dataYYYYMMDD,
         sensacao_termica_prevista: idtPrevisto,
         temperatura_prevista: tempPrevista,
         confianca: confianca,
@@ -526,7 +684,7 @@ export async function obterPredicaoDiaria(dataReferencia?: string, diasHorizonte
   });
 
   return {
-    data_base: baseDate.toISOString().split('T')[0],
+    data_base: extrairTempoFortalezaGMT3(baseDate).dataYYYYMMDD,
     horizonte_dias: horizonte,
     metodo: "Suavização Exponencial Dupla de Holt (DCCALOR - Fortaleza)",
     total_estacoes: estacoesPredicao.length,

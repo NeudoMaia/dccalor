@@ -14,7 +14,8 @@ import {
   obterEstacoesAtuais,
   obterSensacaoDiaria,
   obterPredicaoDiaria,
-  obterDocumentacaoObservatorio
+  obterDocumentacaoObservatorio,
+  extrairTempoFortalezaGMT3
 } from './observatorioService.js';
 
 export default async function handler(req: any, res: any) {
@@ -125,7 +126,7 @@ export default async function handler(req: any, res: any) {
       res.status(200).json({
         sucesso: true,
         tipo: 'consolidado_completo',
-        timestamp: new Date().toISOString(),
+        timestamp: extrairTempoFortalezaGMT3().isoGMT3,
         atual: {
           timestamp: atuais.timestamp,
           fonte_dados: atuais.fonte,
