@@ -69,13 +69,36 @@ const ultimoTimestampIntrinsecoObservatorio: Record<string, number> = {};
  * Converte e valida explicitamente qualquer timestamp para o fuso America/Fortaleza (GMT-3),
  * retornando a string ISO com offset -03:00 e a hora local (0-23) imune ao relógio UTC do container.
  */
-export function extrairTempoFortalezaGMT3(rawInput?: string | number | Date): {
+export function extrairTempoFortalezaGMT3(rawInput?: string | number | Date, gmtTag?: string): {
   isoGMT3: string;
   dataYYYYMMDD: string;
   epochMs: number;
   horaLocalFortaleza: number;
   fusoValidoGMT3: boolean;
 } {
+  // Se o input vem da Plugfield com gmt === 'GMT-3', o timestamp/ISO já está no relógio local de Fortaleza (-03:00)
+  if (rawInput !== undefined && rawInput !== null && gmtTag === 'GMT-3') {
+    const d = new Date(rawInput);
+    if (!isNaN(d.getTime())) {
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const hh = String(d.getUTCHours()).padStart(2, '0');
+      const mi = String(d.getUTCMinutes()).padStart(2, '0');
+      const ss = String(d.getUTCSeconds()).padStart(2, '0');
+      const dataYYYYMMDD = `${yyyy}-${mm}-${dd}`;
+      const isoGMT3 = `${dataYYYYMMDD}T${hh}:${mi}:${ss}-03:00`;
+      const realEpochMs = new Date(isoGMT3).getTime();
+      return {
+        isoGMT3,
+        dataYYYYMMDD,
+        epochMs: realEpochMs,
+        horaLocalFortaleza: d.getUTCHours(),
+        fusoValidoGMT3: true
+      };
+    }
+  }
+
   const parsed = rawInput !== undefined && rawInput !== null ? new Date(rawInput) : new Date();
   const dataValida = isNaN(parsed.getTime()) ? new Date() : parsed;
   const epochMs = dataValida.getTime();
@@ -94,7 +117,7 @@ export function extrairTempoFortalezaGMT3(rawInput?: string | number | Date): {
 
   const partes = formatador.formatToParts(dataValida);
   const mapa = Object.fromEntries(partes.map(p => [p.type, p.value]));
-  const offset = mapa.timeZoneName?.replace('GMT', '') || '-03:00';
+  const offset = (mapa.timeZoneName?.replace('GMT', '') || '-03:00').replace(/\u2212/g, '-');
   const fusoValidoGMT3 = offset === '-03:00';
   const dataYYYYMMDD = `${mapa.year}-${mapa.month}-${mapa.day}`;
   const isoGMT3 = `${dataYYYYMMDD}T${mapa.hour}:${mapa.minute}:${mapa.second}${offset}`;
@@ -106,7 +129,7 @@ export function extrairTempoFortalezaGMT3(rawInput?: string | number | Date): {
 /**
  * Audita a cadência do Time of Measurement intrínseco da estação e impede duplicatas de polling/cache.
  */
-function auditarMeasurementObservatorio(stationId: string, rawMeasurementTime?: string | number): {
+function auditarMeasurementObservatorio(stationId: string, rawMeasurementTime?: string | number, gmtTag?: string): {
   timestampFortalezaISO: string;
   horaLocalFortaleza: number;
   deltaTSegundos: number | null;
@@ -140,7 +163,7 @@ function auditarMeasurementObservatorio(stationId: string, rawMeasurementTime?: 
     };
   }
 
-  const { isoGMT3, epochMs, horaLocalFortaleza, fusoValidoGMT3 } = extrairTempoFortalezaGMT3(rawMeasurementTime);
+  const { isoGMT3, epochMs, horaLocalFortaleza, fusoValidoGMT3 } = extrairTempoFortalezaGMT3(rawMeasurementTime, gmtTag);
 
   if (!fusoValidoGMT3) {
     console.warn(`[QC-TIMEZONE-ALERTA] Estação ${stationId} fora de GMT-3 (America/Fortaleza)`);
@@ -390,8 +413,15 @@ export async function obterEstacoesAtuais(): Promise<{ estacoes: EstacaoAtual[];
       if (!mapping) continue;
 
       // Extração estrita do Time of Measurement intrínseco do pacote da Plugfield
-      const rawMeasurementTime = dev.dashboard?.time ?? dev.lastCommunication ?? dev.updatedAt;
-      const qcTemporal = auditarMeasurementObservatorio(dev.id.toString(), rawMeasurementTime);
+      const rawMeasurementTime =
+        dev.dashboard?.updateDateTime ??
+        dev.dashboard?.lastUpdateTimestamp ??
+        dev.dashboard?.lastSensorData?.time ??
+        dev.lastUpdateTimestamp ??
+        dev.dashboard?.time ??
+        dev.lastCommunication ??
+        dev.updatedAt;
+      const qcTemporal = auditarMeasurementObservatorio(dev.id.toString(), rawMeasurementTime, dev.gmt);
       ultimoTimestampMedicaoGlobal = qcTemporal.timestampFortalezaISO;
       const horaFortaleza = qcTemporal.horaLocalFortaleza;
 

@@ -35,7 +35,7 @@ app.get(['/api/health', '/dccalor/api/health'], (req, res) => {
     timeZoneName: 'longOffset'
   });
   const partes = Object.fromEntries(formatador.formatToParts(agora).map(p => [p.type, p.value]));
-  const offset = partes.timeZoneName?.replace('GMT', '') || '-03:00';
+  const offset = (partes.timeZoneName?.replace('GMT', '') || '-03:00').replace(/\u2212/g, '-');
   const timestampGMT3 = `${partes.year}-${partes.month}-${partes.day}T${partes.hour}:${partes.minute}:${partes.second}${offset}`;
 
   res.status(200).json({
